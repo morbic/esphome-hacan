@@ -68,6 +68,30 @@ jobs:
             -path "./_site" -prune -o \
             -name "*.adoc" -print | sort)
 
+          while IFS= read -r html_file; do
+            temporary_file="${html_file}.tmp"
+            awk '
+              BEGIN {
+                while ((getline line < "docs/site-overrides.css") > 0) {
+                  css = css line "\n"
+                }
+                close("docs/site-overrides.css")
+                injected = 0
+              }
+              /<\/head>/ && !injected {
+                print "<style>"
+                printf "%s", css
+                print "</style>"
+                injected = 1
+              }
+              { print }
+              END {
+                if (!injected) exit 1
+              }
+            ' "$html_file" > "$temporary_file"
+            mv "$temporary_file" "$html_file"
+          done < <(find _site -type f -name "*.html" ! -path "_site/index.html" | sort)
+
           printf '%s\n' \
             '<!doctype html>' \
             '<html lang="en">' \

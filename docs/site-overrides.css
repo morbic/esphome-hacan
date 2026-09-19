@@ -1,0 +1,9 @@
+/* Small overrides layered on top of Asciidoctor's embedded stylesheet. */
+#footer {
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+}
+
+#footer-text {
+  color: rgba(0, 0, 0, 0.6);
+}
