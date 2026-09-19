@@ -14,7 +14,8 @@ The source and destination fields are unsigned 9-bit values.
 |Unassigned
 |A node that has no commissioned address. Valid only as a source for the
 commissioning messages explicitly listed in this specification. It MUST NOT be
-used as a destination.
+used as a destination. Version 1 permits it for `DISCOVERY_REQUEST` and
+`DISCOVERY_RESPONSE` only.
 
 |`0x001` to `0x1FE`
 |Unicast

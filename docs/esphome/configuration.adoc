@@ -69,3 +69,7 @@ failover is not implemented.
 
 Only one active `primary` role is supported in an installation. Address conflict
 handling remains active on every node, as required by the protocol.
+
+An unassigned node also initiates commissioning itself: it broadcasts
+`DISCOVERY_REQUEST` with source address zero after a UID-derived startup delay,
+then uses the protocol retry backoff until it receives its `ADDRESS_ASSIGN`.

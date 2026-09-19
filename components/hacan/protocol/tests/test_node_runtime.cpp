@@ -49,6 +49,20 @@ TEST_CASE("primary manager assigns an address to a discovered unassigned node") 
   CHECK(std::get<ProtocolFrame>(assigned).identifier().kind() == MessageKind::kAddressAssign);
 }
 
+TEST_CASE("unassigned node starts discovery with source address zero") {
+  MemoryStorage storage;
+  CapturingTransmitter transmitter;
+  NodeRuntime runtime{{1, 2, 3, 4, 5, 6}, CommissioningRole::kNone,
+                      storage, transmitter};
+  runtime.tick(0);
+  REQUIRE(transmitter.count == 1);
+  const auto decoded = FrameCodec::decode(transmitter.last);
+  REQUIRE(std::holds_alternative<ProtocolFrame>(decoded));
+  const auto& frame = std::get<ProtocolFrame>(decoded);
+  CHECK(frame.identifier().kind() == MessageKind::kDiscoveryRequest);
+  CHECK(frame.identifier().source().value() == 0);
+}
+
 TEST_CASE("runtime expires an entity mapping when its owner is offline") {
   MemoryStorage storage;
   storage.value = NodeAddress{1};

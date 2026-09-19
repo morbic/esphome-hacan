@@ -119,6 +119,7 @@ bool valid_identifier(const CanIdentifier& identifier) {
   if (identifier.priority() != priority<Kind>()) return false;
   if (source == 0x1FF || destination == 0) return false;
   if constexpr (Kind == MessageKind::kDiscoveryResponse) return !broadcast;
+  if constexpr (Kind == MessageKind::kDiscoveryRequest) return broadcast;
   if (source == 0) return false;
   if constexpr (Kind == MessageKind::kProtocolError ||
                 Kind == MessageKind::kAddressConflict || Kind == MessageKind::kCommand ||

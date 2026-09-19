@@ -36,12 +36,12 @@
 A receiver that does not recognize a reserved kind MUST ignore it and increment
 `rx_unknown_kind`. It MUST NOT interpret it as a known message.
 
-Except for an unassigned `DISCOVERY_RESPONSE`, every transmitted message has a
+Except for an unassigned `DISCOVERY_REQUEST` or `DISCOVERY_RESPONSE`, every transmitted message has a
 commissioned source. `ADDRESS_CLAIM` uses the address being claimed as its
 source. `ANNOUNCE`, `HEARTBEAT`, `DISCOVERY_REQUEST`, `ADDRESS_CLAIM`,
 `ADDRESS_ASSIGN`, and `TIME_SYNC` have a broadcast destination.
 `ENTITY_CLAIM` and `ENTITY_RESOLVE` also have a broadcast destination.
-`DISCOVERY_RESPONSE` is the only version 1 message allowed to use source zero.
+`DISCOVERY_REQUEST` and `DISCOVERY_RESPONSE` are the only version 1 messages allowed to use source zero.
 Source `0x1FF` and destination zero are always invalid.
 
 == Lifecycle messages

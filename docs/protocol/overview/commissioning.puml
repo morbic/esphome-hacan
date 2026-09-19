@@ -5,9 +5,16 @@ participant "Commissioning manager\naddress 0x001" as manager
 participant "Unassigned node\nsource 0" as node
 participant "Other nodes / bridges" as peers
 
-manager -> node: DISCOVERY_REQUEST (broadcast, challenge)
-note right of node: UID-derived randomized delay
-node -> manager: DISCOVERY_RESPONSE (UID, source 0)
+alt Manager-initiated discovery
+  manager -> node: DISCOVERY_REQUEST (broadcast, challenge)
+  note right of node: UID-derived randomized delay
+  node -> manager: DISCOVERY_RESPONSE (UID, source 0)
+else Unassigned-node-initiated discovery
+  node -> manager: DISCOVERY_REQUEST (broadcast, source 0, challenge)
+  note right of node: UID-derived randomized delay\nwithin its own response window
+  node <- manager: DISCOVERY_RESPONSE (own UID, source 0)
+  note right of manager: Learns NodeUID from response
+end
 manager -> node: ADDRESS_ASSIGN (broadcast, target UID, 0x12A)
 note right of node: Persist address, randomized claim delay
 node -> peers: ADDRESS_CLAIM x2 (source 0x12A)

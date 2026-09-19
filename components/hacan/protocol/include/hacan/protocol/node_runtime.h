@@ -64,6 +64,7 @@ class NodeRuntime {
   void expire_offline(std::uint32_t now_ms);
   void withdraw_address();
   void send_claim();
+  void send_discovery_request(std::uint32_t now_ms);
   void send_entity_claim(EntityId entity, EndpointId endpoint);
   void acknowledge(const ProtocolFrame& frame);
   bool is_duplicate(const ProtocolFrame& frame, std::uint32_t now_ms);
@@ -100,6 +101,8 @@ class NodeRuntime {
   std::array<std::optional<Duplicate>, 16> duplicates_{};
   std::uint32_t next_heartbeat_ms_{0};
   std::uint32_t next_claim_ms_{0};
+  std::uint32_t next_discovery_ms_{0};
+  std::uint8_t discovery_attempt_{0};
   std::uint8_t claims_sent_{0};
   std::uint8_t sequence_{0};
 };

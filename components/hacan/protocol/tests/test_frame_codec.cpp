@@ -61,5 +61,15 @@ TEST_CASE("frame codec rejects a heartbeat sent by an unassigned node") {
   CHECK(std::get<DecodeError>(decoded) == DecodeError::kInvalidAddressing);
 }
 
+TEST_CASE("frame codec accepts an unassigned discovery request") {
+  const auto identifier = CanIdentifier::create(
+      Priority::kManagement, MessageKind::kDiscoveryRequest, NodeAddress{0x1FF},
+      NodeAddress{0x000}, 0);
+  REQUIRE(identifier.has_value());
+  const RawCanFrame raw{identifier->to_raw(), true, 8,
+                        {1, 2, 0xE8, 3, 0, 0, 0, 0}};
+  CHECK(std::holds_alternative<ProtocolFrame>(FrameCodec::decode(raw)));
+}
+
 }  // namespace
 }  // namespace hacan::protocol

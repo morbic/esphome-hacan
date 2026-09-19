@@ -16,6 +16,11 @@ void NodeRuntime::receive(const RawCanFrame& raw, std::uint32_t now_ms) {
 
 void NodeRuntime::tick(std::uint32_t now_ms) {
   expire_offline(now_ms);
+  if (!address_ && now_ms >= next_discovery_ms_) {
+    send_discovery_request(now_ms);
+    drain_one();
+    return;
+  }
   if (address_ && claims_sent_ < 2 && now_ms >= next_claim_ms_) {
     send_claim();
     drain_one();
@@ -23,6 +28,27 @@ void NodeRuntime::tick(std::uint32_t now_ms) {
   }
   if (address_ && now_ms >= next_heartbeat_ms_) send_heartbeat(now_ms);
   drain_one();
+}
+
+void NodeRuntime::send_discovery_request(std::uint32_t now_ms) {
+  std::array<std::uint8_t, 8> bytes{};
+  bytes[0] = sequence_++;
+  bytes[1] = 0x02;  // Include unassigned nodes.
+  bytes[2] = 0xE8;
+  bytes[3] = 0x03;
+  bytes[4] = uid_[0] ^ sequence_;
+  bytes[5] = uid_[1];
+  bytes[6] = uid_[2];
+  bytes[7] = uid_[3];
+  const auto payload = DiscoveryRequestFrame::decode(bytes);
+  const auto id = CanIdentifier::create(Priority::kManagement,
+                                        MessageKind::kDiscoveryRequest,
+                                        NodeAddress{0x1FF}, NodeAddress{0}, 0);
+  if (payload && id) enqueue(ProtocolFrame{*id, *payload});
+  constexpr std::array<std::uint32_t, 4> kRetry{2000, 4000, 8000, 16000};
+  const auto delay = discovery_attempt_ < kRetry.size() ? kRetry[discovery_attempt_] : 30000;
+  if (discovery_attempt_ < kRetry.size()) ++discovery_attempt_;
+  next_discovery_ms_ = now_ms + delay;
 }
 
 void NodeRuntime::handle(const ProtocolFrame& frame, std::uint32_t now_ms) {

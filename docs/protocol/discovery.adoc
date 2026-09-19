@@ -18,7 +18,8 @@ include::overview/commissioning.puml[]
 
 == Discovery request and response
 
-`DISCOVERY_REQUEST` is broadcast by a commissioned requester:
+`DISCOVERY_REQUEST` is broadcast by a commissioned requester or an unassigned
+node. An unassigned requester uses source zero.
 
 [cols="1,2,4",options="header"]
 |===
@@ -34,6 +35,15 @@ Each matching node schedules exactly one response within the requested window.
 The delay SHOULD be a deterministic hash of Node UID and challenge modulo the
 window, plus small local timer jitter. This makes retries with a new challenge
 redistribute collisions.
+
+An unassigned node sends its first request after a UID-derived delay from 0 to
+1000 ms. Without a matching `ADDRESS_ASSIGN`, it retries with a new transaction
+and challenge after 2, 4, 8, and 16 seconds, then every 30 seconds.
+
+This is an alternative discovery flow. The unassigned requester also schedules
+one `DISCOVERY_RESPONSE` for its own request within the advertised response
+window. That response carries its Node UID and lets a commissioning manager
+issue `ADDRESS_ASSIGN` without changing either frame layout.
 
 `DISCOVERY_RESPONSE` is sent to the requester. A commissioned node uses its
 normal source address. An unassigned node uses source zero.
