@@ -1,0 +1,115 @@
+= ESPHome implementation architecture
+:toc: left
+:sectnums:
+
+== Goal
+
+The ESPHome implementation is the first HACAN implementation, not part of the
+protocol definition. It must use the generic ESPHome `canbus` API and support
+ESP32 Arduino and ESP-IDF without directly calling framework-specific CAN
+drivers.
+
+The implementation separates the portable protocol library from the ESPHome
+adapter. Neither the codec nor node behavior may depend on ESPHome, Arduino,
+ESP-IDF, heap allocation, or blocking operations.
+
+== Planned source layout
+
+----
+components/hacan/
+  __init__.py
+  hacan_component.h
+  hacan_component.cpp
+  protocol/
+    include/hacan/protocol/
+    src/
+    tests/
+    CMakeLists.txt
+tests/esphome/hacan/
+----
+
+The protocol library is physically below the component so ESPHome copies its
+C++ sources into its generated PlatformIO project. It remains logically
+independent: it uses only standard C++ and has its own CMake build and host
+tests. It can later be extracted into a separate repository without changing
+its public API.
+
+== Runtime flow
+
+----
+ESPHome CAN callback -> HacanComponent -> NodeRuntime -> FrameCodec
+                                        <- generated RawCanFrame
+                                        -> ESPHome CAN transmitter
+----
+
+`HacanComponent` is an adapter. It receives and transmits CAN frames through
+the public ESPHome API, obtains monotonic time, and stores the commissioned
+address using ESPHome persistent preferences. It does not encode payload bytes
+or own protocol state machines.
+
+`NodeRuntime` owns commissioning, address claim and conflict behavior,
+heartbeat scheduling, the volatile entity directory, duplicate tracking,
+bounded transmit queues, and dispatch of application frames. It is called with
+an explicit time value through `tick(uint32_t now_ms)` and therefore creates no
+timers and performs no blocking wait.
+
+`FrameCodec` is the sole byte-level boundary. It converts a validated
+`RawCanFrame` to a `ProtocolFrame` and converts a `ProtocolFrame` to a
+`RawCanFrame`. It implements all message kinds allocated by protocol version
+1, including kinds whose active runtime behavior is deferred.
+
+== Frame model
+
+`CanIdentifier` is a value object for the 29-bit HACAN identifier.
+`RawCanFrame` contains that identifier, the extended-frame flag, DLC, and eight
+data bytes. `ProtocolFrame` composes a `CanIdentifier` and a tagged
+`PayloadVariant`.
+
+Every concrete payload type owns its fields and knows how to encode its exact
+eight-byte representation. `PayloadVariant` is a `std::variant` over those
+payload types. This gives the codec one generic encode/decode API without
+dynamic allocation, virtual ownership, or lifetime ambiguity. It is preferable
+to an `IFrame` hierarchy whose base object would require pointers or a manual
+placement buffer to own derived payloads.
+
+Decoding returns either a complete `ProtocolFrame` or a specific `DecodeError`.
+It does not throw exceptions and never exposes a partially decoded payload.
+Valid but unrecognized future kinds are distinct from malformed frames so the
+runtime can update `rx_unknown_kind` rather than `rx_malformed`.
+
+== Protocol ports
+
+`NodeRuntime` receives small abstractions for its environment:
+
+* `IFrameTransmitter` accepts completed `RawCanFrame` values.
+* `IAddressStorage` loads and durably saves the commissioned `NodeAddress`.
+* `INodeEvents` receives decoded `STATE`, `EVENT`, `COMMAND`, and directory
+  changes for local consumers.
+* Endpoint handlers are registered with the runtime by later ESPHome platforms.
+
+The ESPHome adapter implements these ports. Host tests replace them with simple
+fakes, making lifecycle and recovery behavior deterministic without ESP32
+hardware.
+
+== Endpoint boundary
+
+Endpoint platforms will register an endpoint identifier, capabilities, state
+reader, state publisher, and command handler with `NodeRuntime`. The runtime
+does not infer ownership from arbitrary Home Assistant entities. A platform
+must explicitly declare whether it owns an EntityId or observes one.
+
+Until endpoint platforms exist, the base component can advertise configured
+owned EntityIds and process directory traffic, but it has no physical endpoint
+handler. Commands for an unregistered handler are rejected with `UNSUPPORTED`.
+
+== Queue policy
+
+The component has separate fixed-capacity queues for control, event,
+state/query, management, and diagnostic traffic. Their capacities are generated
+from YAML at firmware build time and implemented with `std::array`; no runtime
+heap allocation occurs. A full queue never evicts a frame in another traffic
+class. Only a pending `STATE` for the same endpoint may be superseded by a newer
+state. Commands and events are never coalesced.
+
+The transmitter drains higher CAN priorities before lower ones. Queue drops are
+reported through `tx_queue_drops`.

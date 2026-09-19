@@ -8,8 +8,9 @@ foundation for distributed home automation over CAN.
 == Documentation
 
 * xref:protocol/index.adoc[Protocol specification]
-* xref:architecture/overview.adoc[Architecture overview]
-* xref:architecture/decisions/index.adoc[Architecture decision records]
+* xref:protocol/architecture.adoc[Protocol architecture]
+* xref:protocol/decisions/index.adoc[Protocol decision records]
+* xref:esphome/index.adoc[ESPHome implementation]
 
 == Status
 

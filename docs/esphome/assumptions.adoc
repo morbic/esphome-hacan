@@ -1,0 +1,30 @@
+= ESPHome implementation assumptions
+:toc: left
+:sectnums:
+
+== Approved assumptions
+
+* The component targets ESP32 and supports both Arduino and ESP-IDF through the
+  public ESPHome `canbus` API.
+* The initial implementation uses the protocol's Classical CAN 2.0B,
+  extended-frame profile only.
+* The ESP32 factory MAC address deterministically supplies the 48-bit NodeUID.
+  The same hardware therefore has the same UID after every restart.
+* `NodeAddress` is commissioned automatically by an active primary manager and
+  stored in persistent ESPHome preferences.
+* Entity aliases are resolved during firmware build using ESPHome substitutions.
+  Nodes contain only numeric EntityIds at runtime.
+* The central entity registry is installation configuration, preferably stored
+  in a private version-controlled configuration repository. Git is history and
+  backup, not a runtime service.
+* A node maintains only the entity mappings required by its local configuration
+  unless it is configured as a controller or diagnostic node.
+* All timing comes from a monotonic millisecond value supplied to `NodeRuntime`.
+* Protocol and ESPHome code use English identifiers, comments, diagnostics, and
+  documentation.
+
+== Draft status
+
+These assumptions guide the first implementation. They do not promote the
+protocol beyond `1.0.0-draft.1`; physical CAN wiring, arbitration, restart, and
+recovery behavior must still be validated in a representative installation.

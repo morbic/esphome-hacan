@@ -1,0 +1,23 @@
+= HACAN-ESP-ADR-0005: Derive node identity and resolve entity aliases at build time
+
+Status: *Accepted*
+
+== Context
+
+Nodes need an immutable NodeUID and stable logical entity assignments. Adding a
+YAML NodeUID override without a current use case increases configuration risk.
+A runtime entity registry would duplicate installation configuration and create
+another availability dependency.
+
+== Decision
+
+Derive NodeUID deterministically from the ESP32 factory MAC address. Persist
+only the commissioned NodeAddress. Store entity aliases in an installation YAML
+file and resolve them through ESPHome substitutions during the firmware build.
+The component receives numeric EntityIds only.
+
+== Consequences
+
+The same ESP32 has the same identity on every restart. Entity ownership stays
+local to node configuration, and the registry has no runtime service role. A
+future NodeUID override can be added without changing existing configurations.

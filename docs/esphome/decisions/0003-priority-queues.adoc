@@ -1,0 +1,23 @@
+= HACAN-ESP-ADR-0003: Use compile-time bounded queues per traffic class
+
+Status: *Accepted*
+
+== Context
+
+The protocol requires bounded transmit queues and reports queue drops, but does
+not prescribe an implementation queue layout. One shared queue would allow
+management traffic such as heartbeats to evict commands, events, or states.
+
+== Decision
+
+Generate fixed queue capacities from the `tx_queues` YAML mapping at firmware
+build time. Use `std::array` storage for separate control, event, state/query,
+management, and diagnostic queues. Drain higher CAN priorities first. A queue
+cannot evict entries in another class. Only unsent state for the same endpoint
+may be coalesced.
+
+== Consequences
+
+Memory use is deterministic and can be tuned per firmware build without heap
+allocation. Commands and events retain their individual occurrences. This is
+an ESPHome implementation policy, not a change to the HACAN wire protocol.

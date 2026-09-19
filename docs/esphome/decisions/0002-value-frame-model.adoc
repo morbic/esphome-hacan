@@ -1,0 +1,22 @@
+= HACAN-ESP-ADR-0002: Use a value-based tagged frame model
+
+Status: *Accepted*
+
+== Context
+
+HACAN has many fixed eight-byte payload layouts. A conventional polymorphic
+`IFrame` hierarchy would require pointers, dynamic ownership, or a manual
+placement buffer when a decoded frame can contain any payload type.
+
+== Decision
+
+Represent decoded frames as `ProtocolFrame`, composed from `CanIdentifier` and
+a `std::variant` of concrete value payloads. Each payload owns and validates
+its fields. `FrameCodec` is the only generic encode/decode boundary and returns
+a complete frame or a typed error without exceptions.
+
+== Consequences
+
+The receive path performs no heap allocation and has explicit object lifetime.
+Adding a message kind requires a payload value type and a codec dispatch entry.
+The core does not expose virtual frame ownership to ESPHome.

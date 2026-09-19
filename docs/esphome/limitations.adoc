@@ -1,0 +1,38 @@
+= Deliberately deferred functionality
+:toc: left
+:sectnums:
+
+The following work is explicitly outside the first ESPHome implementation step.
+It is deferred intentionally, not silently unsupported.
+
+== ESPHome endpoint platforms
+
+`hacan.light`, `hacan.binary_sensor`, `hacan.sensor`, `hacan.switch`, and other
+platforms are not included. Their mappings to `STATE`, `EVENT`, `COMMAND`,
+quality flags, and local behavior require separate endpoint-profile decisions.
+
+== Secondary commissioning takeover
+
+`commissioning_role: secondary` is passive. Automatic takeover after a primary
+becomes offline is not implemented. A safe implementation needs a protocol
+extension for leader election or an expiring lease; treating a missing heartbeat
+as permission to assign addresses can create two active managers after a network
+partition.
+
+== Deferred active runtime services
+
+The codec validates every version 1 kind, but the first runtime step does not
+implement active `CONFIG_GET`, `CONFIG_SET`, `CONFIG_VALUE`,
+`DIAGNOSTIC_REQUEST`, `DIAGNOSTIC_RESPONSE`, or `TIME_SYNC` services. They are
+decoded and reported as unsupported where a directed response is defined.
+
+Active routing bridges, application-specific local automation profiles,
+security profiles, CAN FD, bulk transport, firmware updates, and automatic
+EntityId allocation are also deferred.
+
+== Physical validation
+
+The protocol and component remain draft until tests run on representative
+ESP32 hardware, transceivers, bus lengths, terminations, branching bridges,
+and load conditions. Host tests and ESPHome configuration builds do not replace
+that validation.

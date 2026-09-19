@@ -1,0 +1,34 @@
+= HACAN for ESPHome decision records
+:toc: left
+
+[cols="1,4,1",options="header"]
+|===
+|ID |Decision |Status
+
+|HACAN-ESP-ADR-0001
+|xref:0001-portable-runtime.adoc[Keep the protocol codec and runtime independent of ESPHome]
+|Accepted
+
+|HACAN-ESP-ADR-0002
+|xref:0002-value-frame-model.adoc[Use a value-based tagged frame model]
+|Accepted
+
+|HACAN-ESP-ADR-0003
+|xref:0003-priority-queues.adoc[Use compile-time bounded queues per traffic class]
+|Accepted
+
+|HACAN-ESP-ADR-0004
+|xref:0004-commissioning-roles.adoc[Reserve primary, secondary, and none commissioning roles]
+|Accepted
+
+|HACAN-ESP-ADR-0005
+|xref:0005-identity-and-entity-configuration.adoc[Derive node identity and resolve entity aliases at build time]
+|Accepted
+
+|HACAN-ESP-ADR-0006
+|xref:0006-initial-scope-and-testing.adoc[Stage ESPHome endpoint platforms after the core implementation]
+|Accepted
+|===
+
+These records describe implementation choices. Protocol-wide decisions are in
+xref:../../protocol/decisions/index.adoc[HACAN protocol decision records].

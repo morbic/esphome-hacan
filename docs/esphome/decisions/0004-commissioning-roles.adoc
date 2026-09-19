@@ -1,0 +1,23 @@
+= HACAN-ESP-ADR-0004: Reserve primary, secondary, and none commissioning roles
+
+Status: *Accepted*
+
+== Context
+
+Automatic `ADDRESS_ASSIGN` needs one commissioning manager. A boolean role
+would require a configuration-breaking change before a standby manager can be
+introduced. A standby that promotes itself merely after a missing heartbeat is
+unsafe during a partition.
+
+== Decision
+
+Expose `commissioning_role` with `primary`, `secondary`, and `none` values.
+Only `primary` actively discovers and assigns addresses in the first
+implementation. `secondary` is accepted but passive and reports that takeover
+is unavailable.
+
+== Consequences
+
+The public configuration supports a future backup manager without renaming the
+field. Automatic takeover is deferred until a protocol-level leader election or
+lease design defines safe behavior.

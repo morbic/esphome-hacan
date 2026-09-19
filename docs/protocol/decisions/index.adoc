@@ -1,4 +1,4 @@
-= HACAN architecture decision records
+= HACAN protocol decision records
 :toc: left
 
 [cols="1,4,1",options="header"]

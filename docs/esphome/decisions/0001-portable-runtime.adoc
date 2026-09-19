@@ -1,0 +1,23 @@
+= HACAN-ESP-ADR-0001: Keep the protocol codec and runtime independent of ESPHome
+
+Status: *Accepted*
+
+== Context
+
+The first HACAN implementation is an ESPHome external component, but the
+protocol must be implementable on other platforms. Testing byte formats,
+commissioning, entity resolution, and timers through ESPHome alone would couple
+protocol correctness to generated firmware and hardware APIs.
+
+== Decision
+
+Implement `FrameCodec` and `NodeRuntime` as portable C++ with no ESPHome,
+Arduino, ESP-IDF, or CAN-driver dependency. Inject transmission, persistent
+address storage, and events through narrow interfaces. Make `HacanComponent`
+an adapter over the public ESPHome `canbus` API and persistent preferences.
+
+== Consequences
+
+The core has deterministic host tests and can be extracted later. The adapter
+must translate platform callbacks and storage failures to the core interfaces,
+but it remains small and cannot duplicate protocol logic.

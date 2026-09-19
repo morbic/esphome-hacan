@@ -53,7 +53,7 @@ deferred designs.
 * xref:examples.adoc[Examples and test vectors]
 
 The rationale and alternatives are recorded in
-xref:../architecture/decisions/index.adoc[Architecture decision records].
+xref:decisions/index.adoc[Protocol decision records].
 
 == Scope of version 1
 

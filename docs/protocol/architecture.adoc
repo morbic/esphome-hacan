@@ -1,4 +1,4 @@
-= HACAN architecture overview
+= HACAN protocol architecture
 :toc: left
 :sectnums:
 
@@ -35,7 +35,7 @@ request/response messaging, selective application ACK, and up to seven active
 bridge crossings.
 
 The rationale, rejected alternatives, and consequences are in
-xref:decisions/index.adoc[Architecture decision records]. The records are
+xref:decisions/index.adoc[Protocol decision records]. The records are
 accepted, while the protocol stays in draft until implementation and physical
 installation tests validate the decisions.
 

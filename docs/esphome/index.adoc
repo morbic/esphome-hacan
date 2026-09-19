@@ -1,0 +1,30 @@
+= HACAN for ESPHome
+:toc: left
+:sectnums:
+
+== Status
+
+This documentation describes the approved architecture for the first ESPHome
+implementation. The implementation has not yet been created. HACAN protocol
+version `1.0.0-draft.1` remains a draft until it has been implemented and
+tested on representative physical wiring.
+
+== Documentation
+
+* xref:architecture.adoc[Implementation architecture]
+* xref:configuration.adoc[Planned YAML configuration]
+* xref:assumptions.adoc[Accepted assumptions]
+* xref:limitations.adoc[Deliberately deferred functionality]
+* xref:decisions/index.adoc[ESPHome implementation decision records]
+
+== Scope of the first implementation step
+
+The first step provides a standalone C++ protocol library and the base
+`hacan:` ESPHome component. The library encodes, decodes, and validates every
+message kind defined by protocol version 1. The base component provides node
+lifecycle, commissioning, entity directory behavior, bounded transmit queues,
+and an API for later ESPHome endpoint platforms.
+
+No `hacan.light`, `hacan.binary_sensor`, `hacan.sensor`, or other endpoint
+platform is included in this step. Their semantic mapping is intentionally a
+subsequent design and implementation step.

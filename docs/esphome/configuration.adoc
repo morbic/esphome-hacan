@@ -1,0 +1,71 @@
+= Planned YAML configuration
+:toc: left
+:sectnums:
+
+This page specifies the planned configuration interface for the first base
+component. It is an implementation design, not an available configuration
+until the component is implemented.
+
+== Central entity registry
+
+An installation keeps the alias-to-identifier registry in one YAML file. It is
+included using standard ESPHome packages and substitutions. ESPHome expands the
+substitution before validating the HACAN configuration; the component therefore
+receives a numeric identifier and has no YAML registry parser.
+
+[source,yaml]
+----
+# installation/entities.yaml
+substitutions:
+  hacan_living_room_main_light_switch: "0x01010001"
+  hacan_living_room_main_light: "0x01020001"
+----
+
+The registry is a build-time installation artifact. It contains neither node
+identity nor endpoint ownership and is never transmitted or refreshed at
+runtime. Installation policy should prohibit local redefinition of these
+substitutions.
+
+== Base component
+
+[source,yaml]
+----
+packages:
+  hacan_entities: !include installation/entities.yaml
+
+hacan:
+  canbus_id: hacan_bus
+  commissioning_role: primary  # primary | secondary | none
+  tx_queues:
+    control: 4
+    event: 4
+    state_query: 8
+    management: 4
+    diagnostics: 2
+  owned_entities:
+    - endpoint: 0x01
+      entity_id: ${hacan_living_room_main_light_switch}
+  observed_entities:
+    - entity_id: ${hacan_living_room_main_light}
+----
+
+`NodeUID` is derived deterministically from the ESP32 factory MAC address. No
+YAML override is provided in the first implementation. A `NodeAddress` is
+assigned by commissioning and persisted locally by the component.
+
+`owned_entities` configures the `ENTITY_CLAIM` assignments made by this node.
+`observed_entities` identifies mappings that the node restores through
+`ENTITY_RESOLVE`. Future HACAN endpoint platforms register the same declarations
+automatically; these lists remain a low-level option for endpoints without a
+dedicated platform.
+
+== Commissioning roles
+
+`primary` enables the commissioning manager. It discovers nodes and issues
+`ADDRESS_ASSIGN` for unassigned NodeUIDs. `none` is the normal role for an
+endpoint node. `secondary` is accepted configuration but remains passive in the
+first implementation: it does not assign addresses and logs that automatic
+failover is not implemented.
+
+Only one active `primary` role is supported in an installation. Address conflict
+handling remains active on every node, as required by the protocol.

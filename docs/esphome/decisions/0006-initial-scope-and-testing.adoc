@@ -1,0 +1,24 @@
+= HACAN-ESP-ADR-0006: Stage ESPHome endpoint platforms after the core implementation
+
+Status: *Accepted*
+
+== Context
+
+The protocol defines lifecycle, commissioning, entity resolution, application
+messages, configuration, diagnostics, and time synchronization. ESPHome
+platform mappings need separate decisions about their endpoint semantics.
+
+== Decision
+
+Implement and host-test codecs for every defined version 1 message kind. In the
+first active runtime implement commissioning, lifecycle, entity directory,
+application-frame dispatch, and the public endpoint registration boundary.
+Defer endpoint platforms and active configuration, diagnostics, and time
+services. Use doctest for portable C++ tests and YAML compilation tests for
+Arduino and ESP-IDF integration.
+
+== Consequences
+
+The core has a complete binary grammar without falsely claiming complete device
+functionality. Later endpoint platforms attach through the tested runtime API
+instead of changing the codec or lifecycle behavior.
