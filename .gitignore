@@ -1,8 +1,11 @@
-# Created by https://www.toptal.com/developers/gitignore/api/c++,intellij,macos
-# Edit at https://www.toptal.com/developers/gitignore?templates=c++,intellij,macos
+# Created by https://www.toptal.com/developers/gitignore/api/c++,intellij,macos,cmake
+# Edit at https://www.toptal.com/developers/gitignore?templates=c++,intellij,macos,cmake
 
 # HACAN
 docs/protocol/inspirations/
+
+# Local CMake build trees, including CTest logs and FetchContent downloads.
+/build/
 
 ### C++ ###
 # Prerequisites
@@ -37,6 +40,25 @@ docs/protocol/inspirations/
 *.exe
 *.out
 *.app
+
+### CMake ###
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Testing
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps
+
+### CMake Patch ###
+CMakeUserPresets.json
+
+# External projects
+*-prefix/
 
 ### Intellij ###
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm and Rider
@@ -93,4 +115,4 @@ Temporary Items
 # iCloud generated files
 *.icloud
 
-# End of https://www.toptal.com/developers/gitignore/api/c++,intellij,macos
+# End of https://www.toptal.com/developers/gitignore/api/c++,intellij,macos,cmake

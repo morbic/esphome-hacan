@@ -1,0 +1,35 @@
+name: C++ library CI
+
+on:
+  push:
+    paths:
+      - "components/hacan/protocol/**"
+      - ".github/workflows/ci.yml"
+      - "CMakeLists.txt"
+  pull_request:
+    paths:
+      - "components/hacan/protocol/**"
+      - ".github/workflows/ci.yml"
+      - "CMakeLists.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and test C++17 protocol library
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Configure
+        run: cmake -S components/hacan/protocol -B build/protocol
+
+      - name: Build
+        run: cmake --build build/protocol --parallel
+
+      - name: Test
+        run: ctest --test-dir build/protocol --output-on-failure
