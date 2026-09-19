@@ -42,7 +42,8 @@ interfaces or items return status `UNSUPPORTED` and value zero.
 |`0x000D` |`address_conflicts` |Conflicts detected for any address.
 |`0x000E` |`command_rejections` |Commands rejected after validation.
 |`0x000F` |`free_queue_slots` |Current aggregate transmit queue capacity.
-|`0x0010` to `0x7FFF` |Reserved |Future standard items.
+|`0x0010` |`entity_conflicts` |Distinct online endpoints claiming one EntityId.
+|`0x0011` to `0x7FFF` |Reserved |Future standard items.
 |`0x8000` to `0xFFFF` |Vendor-specific |Meaning defined by implementation.
 |===
 
@@ -57,6 +58,8 @@ A commissioned node performs the following sequence after restart:
 . initialize CAN and generate a new non-zero boot token;
 . wait the claim jitter and complete address claiming;
 . broadcast `ANNOUNCE`;
+. broadcast configured `ENTITY_CLAIM` messages over a UID-derived start window
+  of 0 to 5000 ms, paced at no more than 10 frames per second;
 . accept addressed application traffic;
 . publish initial endpoint states with `INITIAL` set, spread over a UID-derived
   start window of 0 to 5000 ms and paced at no more than 10 frames per second;
@@ -67,8 +70,10 @@ address commissioning. It MUST NOT originate application messages.
 
 Receiving a changed boot token invalidates cached transactions and prior state
 freshness for that source. Consumers SHOULD mark required values stale until
-new states arrive. A node MUST NOT assume that a remote output retained its
-pre-restart state.
+new states arrive. It also invalidates all entity mappings learned from that
+NodeAddress; the owner's startup `ENTITY_CLAIM` messages establish fresh
+mappings. A node MUST NOT assume that a remote output retained its pre-restart
+state.
 
 Reset reason is useful but not included in every announcement. Implementations
 MAY expose it as a diagnostic vendor item until a standard item is assigned.
@@ -97,6 +102,7 @@ Nodes MUST apply these traffic rules:
 * apply deadband and minimum publication interval to noisy analog values;
 * pace wildcard state responses and startup snapshots;
 * randomize discovery, claims, announcements, and heartbeats as specified;
+* pace entity claims and multiple targeted `ENTITY_RESOLVE` requests;
 * bound retries, queues, and diagnostic response rates;
 * coalesce superseded unsent `STATE` values for the same endpoint where safe;
 * never coalesce distinct `EVENT` messages or commands.

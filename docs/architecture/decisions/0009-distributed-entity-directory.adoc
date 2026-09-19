@@ -1,0 +1,58 @@
+= HACAN-ADR-0009: Resolve logical entities through a distributed volatile directory
+
+Status: *Accepted*
+
+== Context
+
+Automation rules should refer to installation functions such as a living-room
+wall input or light output, not to the ESP32 that currently implements them.
+Putting a 32-bit logical identifier in every Classical CAN frame would consume
+half of the payload and displace sequence, type, quality, or value fields.
+Short NodeAddresses can change after recommissioning or hardware replacement.
+
+== Considered options
+
+* Use only NodeAddress and EndpointId in configuration: no additional protocol
+  traffic, but application bindings depend directly on physical addressing.
+* Carry EntityId in every application frame: self-describing traffic, but it
+  does not fit the accepted fixed typed payload without removing other fields.
+* Advertise ownership and resolve EntityId to NodeAddress and EndpointId in a
+  volatile distributed directory: adds management traffic and conflict state,
+  while preserving compact application frames and local operation.
+* Use a permanently online central directory: simple authority, but creates a
+  runtime dependency contrary to the local-autonomy goal.
+
+== Decision
+
+Use 32-bit installation-scoped EntityIds and exactly one owning endpoint per
+entity. Owners advertise assignments with `ENTITY_CLAIM`; nodes rebuild the
+mappings they require in RAM with `ENTITY_RESOLVE`. Normal application messages
+continue to use NodeAddress and EndpointId.
+
+The central installation registry maps human-readable aliases to EntityIds and
+is consumed at firmware build time. It does not contain Node UID, NodeAddress,
+EndpointId, or runtime ownership. Each node's local configuration declares the
+entities it owns and observes.
+
+Version 1 uses no ownership generation counter. Two online owners of the same
+EntityId are a configuration conflict and logical resolution is disabled for
+that entity. A different owner may replace an offline owner, supporting device
+replacement without last-writer-wins behavior.
+
+When a NodeAddress becomes offline, its entity mappings and claims are removed.
+An affected observer resolves required entities again, and every matching owner
+must answer with a fresh claim. A cached competing claim is not promoted without
+this new exchange.
+
+Entity allocation is manual in version 1 and recorded in the installation
+registry. Automated allocation and distribution may be added later without
+changing the EntityId width or normal application frame layouts.
+
+== Consequences
+
+Automation configuration can remain stable across NodeAddress changes and
+hardware replacement. Nodes need bounded RAM for mappings they use and perform
+directory recovery after restart and owner timeout. Entity ownership
+announcements add paced management traffic. Operators must maintain unique
+identifier aliases and ownership declarations; duplicate active owners cause an
+explicit unavailable state instead of silent takeover.

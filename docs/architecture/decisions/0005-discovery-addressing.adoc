@@ -1,6 +1,6 @@
-= HACAN-ADR-0005: Commission stable addresses using a 48-bit Node UID
+= HACAN-ADR-0005: Commission short addresses using a stable 48-bit Node UID
 
-Status: *Proposed*
+Status: *Accepted*
 
 == Context
 
@@ -14,20 +14,23 @@ not otherwise needed for local operation.
 * Manually configured addresses only: minimal protocol, poor installation and
   replacement workflow.
 * Dynamic leases: convenient but depends on an allocator and lease recovery.
-* Persistently commissioned addresses keyed by immutable UID: requires a
-  commissioning step, then operates without a manager.
+* Persistently commissioned short addresses keyed by immutable UID: requires a
+  commissioning step, then operates without a manager and permits later
+  reassignment.
 
 == Decision
 
 Each node has a stable 48-bit Node UID. A temporary manager discovers nodes with
-randomized responses and persistently assigns a 9-bit address. Claims detect
+randomized responses and persistently assigns a short 9-bit transport address.
+The manager may select an unused address automatically. The address is normally
+reused but is not device or entity identity and may be reassigned. Claims detect
 duplicates; the lower UID deterministically keeps a conflicted address while
 the other node withdraws.
 
 == Consequences
 
-Normal traffic carries only short addresses and survives manager loss.
+Normal traffic carries only short addresses and survives manager loss. Entity
+bindings survive reassignment through the distributed entity directory.
 Commissioning needs physical or operational access control. Hardware must
 provide or persist a unique UID. Conflict resolution restores communication but
 does not silently invent a replacement address.
-

@@ -1,6 +1,6 @@
 = HACAN-ADR-0007: Version registries conservatively and ignore compatible extensions
 
-Status: *Proposed*
+Status: *Accepted*
 
 == Context
 
@@ -27,4 +27,3 @@ unknown passive publications, and reject unknown directed operations safely.
 Ordinary messages retain full payload capacity. Implementations need capability
 and unknown-value handling. An incompatible identifier grammar requires a major
 version design and may need a discriminator outside the current layout.
-

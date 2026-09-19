@@ -28,7 +28,9 @@
 |`0x11` |`DIAGNOSTIC_REQUEST` |5 |Unicast |Reads one diagnostic item.
 |`0x12` |`DIAGNOSTIC_RESPONSE` |5 |Requester |Returns one diagnostic item.
 |`0x13` |`TIME_SYNC` |4 |Broadcast |Distributes optional wall-clock time.
-|`0x14` to `0x1F` |Reserved |-- |-- |Future compatible assignment.
+|`0x14` |`ENTITY_CLAIM` |4 |Broadcast |Advertises one logical entity owner.
+|`0x15` |`ENTITY_RESOLVE` |4 |Broadcast |Requests entity ownership claims.
+|`0x16` to `0x1F` |Reserved |-- |-- |Future compatible assignment.
 |===
 
 A receiver that does not recognize a reserved kind MUST ignore it and increment
@@ -38,6 +40,7 @@ Except for an unassigned `DISCOVERY_RESPONSE`, every transmitted message has a
 commissioned source. `ADDRESS_CLAIM` uses the address being claimed as its
 source. `ANNOUNCE`, `HEARTBEAT`, `DISCOVERY_REQUEST`, `ADDRESS_CLAIM`,
 `ADDRESS_ASSIGN`, and `TIME_SYNC` have a broadcast destination.
+`ENTITY_CLAIM` and `ENTITY_RESOLVE` also have a broadcast destination.
 `DISCOVERY_RESPONSE` is the only version 1 message allowed to use source zero.
 Source `0x1FF` and destination zero are always invalid.
 
@@ -71,19 +74,78 @@ reuse across consecutive boots.
 |===
 |Byte |Field |Meaning
 |B0 |Sequence |New sequence value.
-|B1 |Node status |Bits defined below.
+|B1 |Node condition flags |`0x00` means normal operation; nonzero values are defined below.
 |B2..B5 |Boot token |Same token as `ANNOUNCE`.
 |B6 |TX queue load |Approximate percentage, 0 to 100; `0xFF` if unavailable.
 |B7 |Reserved |Zero.
 |===
 
-Node status bit 0 is degraded, bit 1 is configuration required, bit 2 is an
+`0x00` means `NORMAL`: the node has no condition represented by this field. A
+receiver determines liveness from the arrival of `HEARTBEAT` frames and its
+offline timeout; a missing heartbeat is not encoded as a node condition.
+
+Condition flag bit 0 is degraded, bit 1 is configuration required, bit 2 is an
 application fault, bit 3 is CAN error-passive on any local interface, and bit 4
 is bus-off recovery in progress. Bits 5..7 are reserved.
 
-A node SHOULD send a heartbeat every 30 seconds with a stable UID-derived
-jitter of up to plus or minus 5 seconds. A receiver MAY regard a node as offline
-after three expected intervals, but offline policy is not a wire-level state.
+A commissioned node MUST send a heartbeat every 30 seconds with a stable
+UID-derived jitter of up to plus or minus 5 seconds. Every valid frame from a
+commissioned source proves liveness and refreshes its receiver's `last_seen`
+time. A node maintaining entity mappings MUST regard a source as offline after
+105 seconds without any valid frame from it. Offline is a local directory state,
+not a value encoded in `HEARTBEAT`.
+
+== Entity directory messages
+
+Entity directory messages advertise and resolve the mapping between logical
+EntityIds and compact transport endpoints. The ownership and conflict rules are
+defined in xref:entities.adoc[Logical entities and distributed directory].
+
+=== ENTITY_CLAIM
+
+[cols="1,2,4",options="header"]
+|===
+|Byte |Field |Meaning
+|B0 |Sequence |New sequence value.
+|B1 |Endpoint |Owning endpoint, `0x01..0xFE`.
+|B2..B5 |EntityId |Claimed non-zero `UINT32`.
+|B6..B7 |Reserved |Zero.
+|===
+
+The source NodeAddress and B1 Endpoint identify the current transport endpoint.
+Repeating the same ownership claim is idempotent.
+
+An owner MUST broadcast its claims after completing address claim and after a
+configured assignment changes. It MUST also send a fresh claim within the
+response window of every valid matching `ENTITY_RESOLVE`. Broadcast claims are
+never acknowledged. Invalid claims are ignored and counted as malformed;
+ownership conflicts are handled as configuration conflicts, not as malformed
+frames.
+
+=== ENTITY_RESOLVE
+
+[cols="1,2,4",options="header"]
+|===
+|Byte |Field |Meaning
+|B0 |Transaction |Requester-selected value used in response spreading.
+|B1 |Reserved |Zero.
+|B2..B5 |EntityId |Requested non-zero `UINT32`.
+|B6..B7 |Window |Response window in milliseconds, `UINT16`; 1000..10000.
+|===
+
+Every configured owner responds. Its `ENTITY_CLAIM` is scheduled at a
+deterministic hash of Node UID, EntityId, transaction, and local timer jitter
+modulo the response window. Multiple responses reveal duplicate ownership.
+
+The requester MAY repeat resolution with a different transaction after an
+incomplete window. Repeated requests do not change ownership or persistent
+configuration. An unresolved entity remains unavailable to logical bindings.
+A node that needs multiple mappings sends individually paced requests for the
+EntityIds present in its persistent configuration. Before transmitting, it
+applies a deterministic NodeAddress-and-EntityId-derived suppression delay from
+0 to 250 ms. Hearing another valid request for the same EntityId during that
+delay cancels the local request; the node listens through the observed response
+window instead.
 
 == Application value messages
 

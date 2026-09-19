@@ -1,6 +1,6 @@
 = HACAN-ADR-0004: Use event-driven mixed communication and selective ACK
 
-Status: *Proposed*
+Status: *Accepted*
 
 == Context
 
@@ -30,4 +30,3 @@ configuration writes always require it. Retries are bounded and deduplicated.
 Normal bus load remains low and nodes can cooperate without a central server.
 Command receivers retain a small transaction cache. Applications must treat
 published state, rather than ACK, as authoritative physical state.
-

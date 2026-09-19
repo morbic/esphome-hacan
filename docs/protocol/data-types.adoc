@@ -108,21 +108,24 @@ names or device class.
 |`0x00` |None |Dimensionless or endpoint-specific enumeration
 |`0x01` |Percent |`FLOAT32`, range 0.0 to 100.0
 |`0x02` |Degree Celsius |`FLOAT32`
-|`0x03` |Relative humidity percent |`FLOAT32`, range 0.0 to 100.0
-|`0x04` |Volt |`FLOAT32`
-|`0x05` |Ampere |`FLOAT32`
-|`0x06` |Watt |`FLOAT32`
-|`0x07` |Watt-hour |`FLOAT32` or `UINT32` as declared
-|`0x08` |Second |Numeric type as declared
-|`0x09` |Hertz |`FLOAT32`
-|`0x0A` |Lux |`FLOAT32`
-|`0x0B` |Pascal |`FLOAT32`
-|`0x0C` |Degree |`FLOAT32`
-|`0x0D` |Meter |`FLOAT32`
-|`0x0E` |Byte |`UINT32`
-|`0x0F` to `0xFE` |Reserved |Future registry assignment
+|`0x03` |Volt |`FLOAT32`
+|`0x04` |Ampere |`FLOAT32`
+|`0x05` |Watt |`FLOAT32`
+|`0x06` |Watt-hour |`FLOAT32` or `UINT32` as declared
+|`0x07` |Second |Numeric type as declared
+|`0x08` |Hertz |`FLOAT32`
+|`0x09` |Lux |`FLOAT32`
+|`0x0A` |Pascal |`FLOAT32`
+|`0x0B` |Degree |`FLOAT32`
+|`0x0C` |Meter |`FLOAT32`
+|`0x0D` |Byte |`UINT32`
+|`0x0E` to `0xFE` |Reserved |Future registry assignment
 |`0xFF` |Implementation-specific |Not interoperable without an external profile
 |===
+
+`Percent` is a unit, not a measurement semantic. For example, relative humidity,
+actuator position, brightness, and battery charge may all use unit `0x01` while
+their distinct meanings are declared by the endpoint's published profile.
 
 An implementation-specific unit MAY be used during development but SHOULD NOT
 be used by a published interoperable endpoint profile.
@@ -146,4 +149,3 @@ snapshot.
 |===
 
 When `VALID` is clear, consumers MUST treat the value slot as informational only.
-

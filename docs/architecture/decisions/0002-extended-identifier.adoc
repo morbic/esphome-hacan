@@ -1,6 +1,6 @@
 = HACAN-ADR-0002: Use one extended identifier layout with global node addresses
 
-Status: *Proposed*
+Status: *Accepted*
 
 == Context
 
@@ -33,4 +33,3 @@ Acceptance filters can select kinds or destinations. Extended frames consume
 more bus time than standard frames. Mixed non-HACAN traffic requires explicit
 installation planning because standard identifiers win arbitration over an
 extended identifier with the same 11-bit base.
-

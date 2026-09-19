@@ -1,0 +1,176 @@
+= Logical entities and distributed directory
+:toc: left
+:sectnums:
+
+== Purpose
+
+A logical entity identifies an installation function independently of the node
+that currently implements it. Examples are a wall input, a relay output, a
+temperature measurement, or a light actuator. A physical node may own multiple
+entities, and replacing that node does not require changing the identifiers of
+the installation functions assigned to its replacement.
+
+HACAN version 1 keeps logical identity separate from transport addressing:
+
+* `Node UID` identifies one physical node and is immutable;
+* `NodeAddress` is the node's current short transport address and may be
+  reassigned;
+* `EndpointId` selects one function within the addressed node;
+* `EntityId` identifies the semantic installation function assigned to an
+  endpoint.
+
+Normal `STATE`, `EVENT`, and `COMMAND` frames continue to carry the short
+`NodeAddress` and `EndpointId`. Nodes resolve these transport references through
+the distributed entity directory described below. `EntityId` is not repeated in
+every application frame.
+
+== Entity identifier
+
+`EntityId` is an unsigned 32-bit value with this installation-defined structure:
+
+[cols="1,2,4",options="header"]
+|===
+|Bits |Field |Meaning
+
+|31..24 |Area |Installation area or room code.
+|23..16 |Class |Semantic function class defined by the installation registry.
+|15..0 |Instance |Unique instance of that class within the area.
+|===
+
+`0x00000000` means unassigned and MUST NOT be claimed. Area and class code
+assignments are maintained in the installation entity registry. Until standard
+area and entity-class registries are published, their numeric meanings are
+installation-specific and MUST be documented with the installation.
+
+Human-readable aliases such as `living_room_main_light` are configuration
+metadata and are not transmitted on the bus. An alias MUST resolve to exactly
+one `EntityId` within an installation.
+
+Each independently observable or commandable function SHOULD have its own
+identifier. For example, a wall input and the light output controlled by a rule
+are separate entities even when the installation gives them related names.
+
+== Ownership
+
+An assigned `EntityId` MUST have at most one owning endpoint at a time. Ownership means that the
+endpoint is authoritative for publications from that entity and is the target
+of commands addressed to that entity. The owning node stores its configured
+`EntityId` assignments persistently or obtains them from persistent firmware
+configuration before joining normal operation.
+
+The installation entity registry is the source of truth for names and numeric
+identifiers. In version 1 it is a manually maintained, version-controlled
+configuration file. It MUST record each alias and EntityId and SHOULD record
+area, class, and descriptive metadata. Node UID, NodeAddress, EndpointId, and
+current ownership are not part of this registry.
+
+The registry SHOULD be stored with the private configuration of the installation,
+for example in the same version-controlled repository as its ESPHome YAML. Git
+or another version-control system provides history and backup but has no runtime
+role in HACAN. The concrete registry file syntax is implementation-specific; a
+minimal YAML representation may be:
+
+[source,yaml]
+----
+entities:
+  living_room_main_light_switch: 0x01010001
+  living_room_main_light: 0x01020001
+----
+
+Ownership and subscriptions are declared in each node's persistent firmware
+configuration. Build tooling resolves registry aliases to numeric EntityIds and
+embeds only the identifiers that the node owns or observes. Nodes do not load or
+refresh the central registry at runtime.
+
+Moving hardware without changing its logical function preserves the
+`EntityId`. Repurposing an endpoint for a different installation function
+assigns a different `EntityId` while preserving its Node UID. Replacing failed
+hardware assigns the existing `EntityId` to the replacement endpoint.
+
+== Directory model
+
+Nodes that use logical bindings maintain these volatile mappings as needed:
+
+----
+EntityId -> NodeAddress + EndpointId
+NodeAddress + EndpointId -> EntityId
+----
+
+The source NodeAddress in an `ENTITY_CLAIM` and the EndpointId in its payload
+directly identify the current transport endpoint. A node MAY retain only the
+entities referenced by its local rules or commands; controller and diagnostic
+nodes MAY retain the complete directory. The learned directory is volatile and
+MUST be rebuildable after restart; it need not be written to flash.
+
+Before sending a command by logical entity, an implementation resolves the
+`EntityId` to the current NodeAddress and EndpointId and then sends an ordinary
+unicast `COMMAND`. When receiving an application publication, it may resolve
+the source NodeAddress and EndpointId back to an `EntityId` before evaluating
+local rules.
+
+== Duplicate ownership
+
+Repeating an identical claim from the same NodeAddress and EndpointId is
+idempotent. A different `EntityId` claimed by the same transport endpoint
+replaces that endpoint's previous directory entry.
+
+Claims for one `EntityId` from different online NodeAddresses or different
+endpoints are a configuration conflict. An observer MUST NOT choose the most
+recent claim. It marks the entity conflicted, increments `entity_conflicts`, and
+MUST NOT use logical resolution to send a command to or consume a publication
+as that entity until the conflict is removed.
+
+When a NodeAddress becomes offline, every mapping and conflicting claim from
+that address is removed from the active directory. Removing one side of a
+conflict MUST NOT automatically promote a previously cached competing claim.
+The entity remains unresolved until a fresh `ENTITY_CLAIM` is received. A node
+whose persistent configuration uses the entity MUST start `ENTITY_RESOLVE`; every
+online owner of that EntityId MUST answer with a new claim.
+
+This permits deliberate hardware replacement without a generation counter. If
+the previous owner later returns and claims the same entity while its
+replacement remains online, the entity is conflicted again.
+
+An owner that observes another online endpoint claiming one of its configured
+entities SHOULD set the heartbeat `configuration required` condition. The
+protocol does not automatically decide which device is correct.
+
+== Directory recovery
+
+A directory participant maintains a `last_seen` time for every NodeAddress
+represented in its mappings. Every valid HACAN frame from that source refreshes
+`last_seen`; the mandatory heartbeat bounds silence for an otherwise idle node.
+After 105 seconds without any valid frame, the participant MUST mark the source
+offline, remove its active entity mappings and claims, and stop using them for
+commands or local rules.
+
+A successful address claim that associates an already observed NodeAddress with
+a different Node UID also invalidates all entity mappings for that address. The
+Node UID may be retained in a separate runtime addressing table for discovery
+and diagnostics, but it is not part of an entity directory entry.
+
+After successfully claiming its NodeAddress, a node broadcasts one
+`ENTITY_CLAIM` for every configured entity. Claims are paced and randomized as
+defined in xref:diagnostics.adoc[Diagnostics, restart, and overload behavior].
+A node also repeats the affected claims after its entity configuration changes
+and MUST respond to every valid matching `ENTITY_RESOLVE` with a fresh claim.
+
+A node that starts later or loses its volatile directory MUST use `ENTITY_RESOLVE`
+to request each entity required by its persistent local configuration. Responses
+are randomized across the requested window. Normal application operation that
+depends on an unresolved or conflicted entity remains inactive until resolution
+succeeds. Stateful consumers SHOULD request current state after resolving an
+owner; transient events sent before resolution need not be replayed.
+
+Before originating a resolve request, a node waits a deterministic
+NodeAddress-and-EntityId-derived delay from 0 to 250 ms. If it observes another
+valid `ENTITY_RESOLVE` for the same EntityId during that delay, it cancels its
+own request and listens for the response window announced by the observed
+request. It MAY retry with a new transaction when no valid claim arrives. This
+suppresses duplicate recovery requests from nodes that detect the same outage
+at nearly the same time.
+
+Version 1 defines discovery and conflict detection but does not automatically
+allocate EntityIds. A future commissioning implementation may allocate and
+distribute assignments while preserving the 32-bit identifiers and all normal
+application frame layouts.

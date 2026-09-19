@@ -1,6 +1,6 @@
 = HACAN-ADR-0001: Use Classical CAN 2.0B for protocol version 1
 
-Status: *Proposed*
+Status: *Accepted*
 
 == Context
 
@@ -27,4 +27,3 @@ with normal controller retransmission. CAN FD is reserved for a future ADR.
 Every application payload is at most eight bytes. Version 1 cannot transfer
 long names, firmware, certificates, or arbitrary configuration. The initial
 codec and tests have one data-link mode. Hardware selection remains broad.
-

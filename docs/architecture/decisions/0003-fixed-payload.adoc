@@ -1,6 +1,6 @@
 = HACAN-ADR-0003: Use fixed eight-byte typed messages without fragmentation
 
-Status: *Proposed*
+Status: *Accepted*
 
 == Context
 
@@ -28,4 +28,3 @@ The codec can be allocation-free and validate every message locally. Text,
 bulk data, and atomic multi-key configuration are unavailable. A future
 segmented transport requires a separate ADR and cannot reuse reserved values
 without defining resource and recovery rules.
-

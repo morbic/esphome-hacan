@@ -1,6 +1,6 @@
 = HACAN-ADR-0008: Define version 1 as a physically trusted protocol
 
-Status: *Proposed*
+Status: *Accepted*
 
 == Context
 
@@ -29,4 +29,3 @@ mode and segment filtering are deployment mitigations, not cryptographic claims.
 The baseline is appropriate only for protected building wiring. External
 segments require isolation or filtering. A future authenticated profile needs a
 dedicated ADR and may select CAN FD or a bounded segmented transport.
-

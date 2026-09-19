@@ -6,7 +6,7 @@
 
 Identifiers are 29-bit hexadecimal values. Payload bytes are listed from `B0`
 to `B7`. All examples have the extended-frame flag set, RTR clear, and DLC 8.
-They are normative encoding vectors for the proposed version 1 layout.
+They are normative encoding vectors for the draft version 1 layout.
 
 == Boolean state publication
 
@@ -121,6 +121,38 @@ CAN ID  = 0x103FF950
 data    = 01 01 00 13 78 56 34 12
 ----
 
+== Entity directory resolution
+
+Node `0x12A` owns EntityId `0x01010001` on endpoint `0x03`. The identifier fields mean
+area `0x01`, class `0x01`, and instance `0x0001`. It broadcasts sequence `0x02`:
+
+----
+priority = 4, kind = ENTITY_CLAIM (0x14), destination = 0x1FF
+source = 0x12A, hop = 0
+CAN ID  = 0x129FF950
+data    = 02 03 01 00 01 01 00 00
+----
+
+Node `0x001` later requests the owner of that entity with transaction `0x60`
+and a 1000 ms response window:
+
+----
+priority = 4, kind = ENTITY_RESOLVE (0x15), destination = 0x1FF
+source = 0x001, hop = 0
+CAN ID  = 0x12BFF008
+data    = 60 00 01 00 01 01 E8 03
+----
+
+The owner responds with another `ENTITY_CLAIM` after its deterministic delay.
+The requester installs mapping `0x01010001 -> 0x12A:0x03` directly from the CAN
+source and payload endpoint. A simultaneous claim for `0x01010001` from another
+online NodeAddress creates a conflict; it does not replace this mapping.
+
+If source `0x12A` produces no valid frame for 105 seconds, observers remove all
+of its entity mappings. An observer that still requires `0x01010001` sends a new
+`ENTITY_RESOLVE`; a replacement owner must answer with a fresh `ENTITY_CLAIM`
+before the mapping becomes usable again.
+
 == Required negative vectors
 
 A codec test suite should reject or ignore, as specified:
@@ -153,8 +185,20 @@ A codec test suite should reject or ignore, as specified:
 |Encode `BOOL` as `02`
 |Reject typed value as invalid.
 
-|Send unknown message kind `0x14`
+|Send unknown message kind `0x16`
 |Ignore and increment `rx_unknown_kind`.
+
+|Claim EntityId zero or use endpoint zero in `ENTITY_CLAIM`
+|Reject as malformed and do not update the directory.
+
+|Observe two online NodeAddresses claim one EntityId
+|Mark the entity conflicted and do not resolve commands or publications through it.
+
+|Receive no valid frame from an entity owner for 105 seconds
+|Mark the NodeAddress offline and remove all of its active entity mappings.
+
+|Cache a competing claim and then observe the previous owner go offline
+|Keep the entity unresolved until a fresh claim answers `ENTITY_RESOLVE`.
 
 |Forward a frame whose hop is 7
 |Drop and increment `route_hop_limit_drops`.
@@ -168,7 +212,7 @@ A codec test suite should reject or ignore, as specified:
 The future codec test suite should cover identifier round trips for every field
 boundary, every data type at minimum and maximum values, reserved-bit
 validation, sequence wrap from `0xFF` to `0x00`, duplicate commands, changed
-boot tokens, discovery jitter bounds, deterministic conflict winners, route
-learning and expiry, hop exhaustion, queue overload, and unknown minor-version
-extensions.
-
+boot tokens, discovery jitter bounds, deterministic address-conflict winners,
+entity resolution windows, duplicate entity ownership, directory recovery,
+offline mapping removal, request suppression, route learning and expiry, hop
+exhaustion, queue overload, and unknown minor-version extensions.

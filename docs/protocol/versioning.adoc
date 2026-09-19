@@ -15,9 +15,10 @@ of the protocol version.
   definitions that remain safely ignorable by an older receiver.
 * PATCH changes clarify text without changing valid wire behavior.
 
-This document specifies proposed protocol `1.0.0-draft.1`. Draft revisions are
-not compatibility promises. The first accepted publication removes the draft
-suffix.
+This document specifies protocol draft `1.0.0-draft.1`. Draft revisions are not
+compatibility promises. The draft suffix remains until the first implementation
+has been tested on representative hardware, wiring, and installation traffic.
+Publication of version `1.0.0` removes the suffix.
 
 == Compatibility rules
 
@@ -44,6 +45,7 @@ The project maintains registries for:
 * value data types and units;
 * request operations and status values;
 * standard diagnostic items;
+* entity area and class codes where standardized by the project;
 * published device classes and endpoint profile identifiers;
 * standard configuration keys within each profile.
 
@@ -70,4 +72,3 @@ CAN FD, generic segmentation, authenticated messages, group addressing, and
 bulk transfer are not encoded by consuming currently reserved bits ad hoc. Each
 requires an ADR covering coexistence, resource bounds, failure recovery, and
 compatibility with version 1 nodes.
-

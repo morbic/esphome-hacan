@@ -1,6 +1,6 @@
 = HACAN-ADR-0006: Use active bridges and one global address space
 
-Status: *Proposed*
+Status: *Accepted*
 
 == Context
 
@@ -28,4 +28,3 @@ increment a hop field, bound queues, and suppress recent duplicates.
 Each segment can be correctly terminated and may be isolated. Bridge software
 is more complex and adds latency. Cyclic routed topologies are unsupported; hop
 and duplicate controls contain faults but do not make cycles valid.
-

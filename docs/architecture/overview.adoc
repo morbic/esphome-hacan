@@ -25,20 +25,23 @@ An ESPHome integration will translate profiles and endpoints into ESPHome
 entities. That mapping must not redefine wire values or make ESPHome behavior a
 requirement for other implementations.
 
-== Proposed baseline
+== Accepted draft baseline
 
-The proposed version 1 baseline is Classical CAN 2.0B at 125 kbit/s with 29-bit
-identifiers and fixed eight-byte payloads. It provides 510 global node addresses,
-254 function endpoints per node, mixed event and request/response messaging,
-selective application ACK, and up to seven active bridge crossings.
+The accepted version 1 draft baseline is Classical CAN 2.0B at 125 kbit/s with
+29-bit identifiers and fixed eight-byte payloads. It provides 510 global node
+addresses, 254 function endpoints per node, installation-scoped logical
+EntityIds resolved through a volatile distributed directory, mixed event and
+request/response messaging, selective application ACK, and up to seven active
+bridge crossings.
 
 The rationale, rejected alternatives, and consequences are in
-xref:decisions/index.adoc[Architecture decision records]. All initial records
-remain `Proposed` until reviewed and accepted.
+xref:decisions/index.adoc[Architecture decision records]. The records are
+accepted, while the protocol stays in draft until implementation and physical
+installation tests validate the decisions.
 
 == Next implementation boundary
 
-After accepting the baseline decisions, the next increment should implement a
-standalone allocation-free frame codec plus host unit tests for every vector in
-the protocol examples. ESPHome code generation and entities should build on
-that tested codec rather than mixing bit manipulation with platform callbacks.
+The next increment should implement a standalone allocation-free frame codec
+and bounded entity directory plus host unit tests for every vector in the
+protocol examples. ESPHome code generation and entities should build on that
+tested core rather than mixing bit manipulation with platform callbacks.

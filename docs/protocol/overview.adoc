@@ -31,13 +31,16 @@ states merely to indicate liveness; `HEARTBEAT` exists for that purpose.
 
 == Nodes and endpoints
 
-A node is one physical or logical participant with one installation-wide node
-address. An endpoint is a function within that node, for example a digital
-input, relay, temperature channel, or status LED.
+A node is one physical or logical participant with one installation-wide short
+transport address. An endpoint is a function within that node, for example a
+digital input, relay, temperature channel, or status LED.
 
 Node addresses are global across all actively bridged segments. Endpoint
 identifiers are local to a node. The pair `(node address, endpoint identifier)`
-therefore identifies a function installation-wide.
+addresses a function at the current time but is not its stable semantic
+identity. An installation-scoped `EntityId` identifies the logical function and
+is resolved to the current node and endpoint through the distributed directory;
+see xref:entities.adoc[Logical entities and distributed directory].
 
 == Layering
 
@@ -82,9 +85,11 @@ not HACAN version 1 frames and MUST NOT be decoded as HACAN.
 == Local autonomy
 
 The wire protocol enables local autonomy but does not define a rule engine.
-Nodes MAY store local bindings or rules and exchange `EVENT`, `STATE`, and
-`COMMAND` messages without an online gateway. Failure behavior of an actuator
-is endpoint-specific configuration; no universal safe output value is assumed.
+Nodes MAY store local bindings or rules expressed using EntityIds and exchange
+`EVENT`, `STATE`, and `COMMAND` messages without an online gateway. The volatile
+entity directory resolves those bindings to compact transport addresses.
+Failure behavior of an actuator is endpoint-specific configuration; no
+universal safe output value is assumed.
 
 == Deliberate constraints
 
@@ -92,4 +97,3 @@ The fixed frame size avoids allocation and reassembly state. Human-readable
 names, long strings, certificates, firmware images, and other bulk data do not
 fit in version 1. Such data belongs in an explicitly designed future transport,
 not in undocumented sequences of frames.
-

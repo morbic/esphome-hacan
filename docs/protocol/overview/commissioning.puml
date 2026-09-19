@@ -13,6 +13,7 @@ note right of node: Persist address, randomized claim delay
 node -> peers: ADDRESS_CLAIM x2 (source 0x12A)
 alt no conflict
   node -> peers: ANNOUNCE (boot token)
+  node -> peers: ENTITY_CLAIM per configured endpoint, paced
   node -> peers: initial STATE messages, paced
 else duplicate address observed
   peers -> node: ADDRESS_CONFLICT (winning UID)

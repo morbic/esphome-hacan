@@ -7,37 +7,40 @@
 
 |HACAN-ADR-0001
 |xref:0001-classical-can.adoc[Use Classical CAN 2.0B for protocol version 1]
-|Proposed
+|Accepted
 
 |HACAN-ADR-0002
 |xref:0002-extended-identifier.adoc[Use one extended identifier layout with global node addresses]
-|Proposed
+|Accepted
 
 |HACAN-ADR-0003
 |xref:0003-fixed-payload.adoc[Use fixed eight-byte typed messages without fragmentation]
-|Proposed
+|Accepted
 
 |HACAN-ADR-0004
 |xref:0004-communication-model.adoc[Use event-driven mixed communication and selective ACK]
-|Proposed
+|Accepted
 
 |HACAN-ADR-0005
-|xref:0005-discovery-addressing.adoc[Commission stable addresses using a 48-bit Node UID]
-|Proposed
+|xref:0005-discovery-addressing.adoc[Commission short addresses using a stable 48-bit Node UID]
+|Accepted
 
 |HACAN-ADR-0006
 |xref:0006-active-bridges.adoc[Use active bridges and one global address space]
-|Proposed
+|Accepted
 
 |HACAN-ADR-0007
 |xref:0007-versioning.adoc[Version registries conservatively and ignore compatible extensions]
-|Proposed
+|Accepted
 
 |HACAN-ADR-0008
 |xref:0008-security-baseline.adoc[Define version 1 as a physically trusted protocol]
-|Proposed
+|Accepted
+
+|HACAN-ADR-0009
+|xref:0009-distributed-entity-directory.adoc[Resolve logical entities through a distributed volatile directory]
+|Accepted
 |===
 
 ADR identifiers are permanent. When a decision changes, its record is marked
 superseded and links to the replacement; identifiers are never reused.
-

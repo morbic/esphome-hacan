@@ -40,9 +40,10 @@ source, destination, DLC, or payload.
 
 A bridge learns `source address -> ingress interface` from every valid frame
 whose source is commissioned. `ADDRESS_CLAIM`, `ANNOUNCE`, and `HEARTBEAT`
-refresh the route. A route observed on another interface moves to that interface
-and increments `route_moves`; rapid repeated movement SHOULD set degraded status
-because it suggests a duplicate address or loop.
+refresh the route. `ENTITY_CLAIM` also refreshes the route after its source
+identity has been learned. A route observed on another interface moves to that
+interface and increments `route_moves`; rapid repeated movement SHOULD set
+degraded status because it suggests a duplicate address or loop.
 
 Learned routes expire after 180 seconds without traffic. This value is longer
 than the heartbeat offline interval and allows stale paths to recover without a

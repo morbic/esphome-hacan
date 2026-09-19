@@ -2,7 +2,7 @@
 :toc: left
 :sectnums:
 
-Status: *Proposed, version 1.0.0-draft.1*
+Status: *Draft, version 1.0.0-draft.1*
 
 HACAN (Home Automation over CAN) is an application protocol for distributed home
 automation nodes connected by Classical CAN. This specification is independent
@@ -12,8 +12,9 @@ The keywords *MUST*, *MUST NOT*, *REQUIRED*, *SHOULD*, *SHOULD NOT*, and *MAY*
 are to be interpreted as described by RFC 2119 and RFC 8174 when, and only when,
 they appear in uppercase.
 
-This draft is a design proposal. Its decisions become project requirements only
-after the corresponding architecture decision records are accepted.
+The architecture decisions referenced by this draft are accepted project
+directions. The protocol remains a draft: its wire details may change until the
+first implementation has been tested in a representative physical installation.
 
 == Design status
 
@@ -23,21 +24,23 @@ devices, active branching, local operation during central-service outages,
 event-oriented traffic, deterministic embedded behavior, and future-compatible
 extension.
 
-The concrete wire choices in this specification are proposals derived from
-those constraints. In particular, Classical CAN, 29-bit identifiers, the bit
-layout, 9-bit addresses, payload schemas, timing defaults, acknowledgement
-policy, and commissioning procedure are not pre-existing requirements.
+The accepted baseline includes Classical CAN, 29-bit identifiers, the bit
+layout, 9-bit addresses, fixed payload schemas, event-driven communication,
+commissioned addressing, active bridges, a distributed entity directory, and a
+physically trusted security model.
 
-The main review decisions still open are acceptance or revision of the eight
-proposed ADRs, validation of 125 kbit/s and CAN timing against the intended
-wiring, definition of the first endpoint profiles, and selection of actuator
-failure policies. Authenticated operation, group addressing, firmware transfer,
-and CAN FD remain explicitly deferred designs.
+Before the draft can become version 1.0.0, an implementation must validate the
+codec, timing, discovery, entity resolution, conflict behavior, restart load,
+and bridge behavior on representative hardware and wiring. The first endpoint
+profiles and actuator failure policies also remain to be defined. Authenticated
+operation, group addressing, firmware transfer, and CAN FD remain explicitly
+deferred designs.
 
 == Specification map
 
 * xref:overview.adoc[Protocol overview]
 * xref:addressing.adoc[Addressing]
+* xref:entities.adoc[Logical entities and distributed directory]
 * xref:frame-format.adoc[CAN identifier and frame format]
 * xref:message-types.adoc[Message types and payloads]
 * xref:data-types.adoc[Data types and value representation]
@@ -58,16 +61,18 @@ Version 1 defines:
 
 * Classical CAN data frames with a 29-bit extended identifier and an 8-byte
   payload;
-* global node addresses and local endpoint identifiers;
+* global node addresses, local endpoint identifiers, and installation-scoped
+  logical entity identifiers;
 * state, event, command, request/response, configuration, discovery, time, and
   diagnostic messages;
 * optional application acknowledgements with bounded retries;
 * active forwarding between CAN segments arranged as a tree;
 * compatibility and extension rules.
 
-Version 1 does not define firmware transfer, generic payload fragmentation,
-dynamic endpoint schemas, authentication, encryption, or an ESPHome entity
-mapping. These are deliberate exclusions, not implied features.
+Version 1 does not define automated EntityId allocation, firmware transfer,
+generic payload fragmentation, dynamic endpoint schemas, authentication,
+encryption, or an ESPHome/Home Assistant entity mapping. These are deliberate
+exclusions, not implied features.
 
 == Conformance
 

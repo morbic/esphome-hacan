@@ -14,6 +14,25 @@ It does not define configuration files, multi-key transactions, strings, or
 fragmentation. Runtime actions and temporary values use `COMMAND`, not
 `CONFIG_SET`.
 
+== Entity assignments
+
+The installation entity registry maps human-readable aliases to numeric
+EntityIds and optional descriptive metadata. It does not assign Node UIDs,
+NodeAddresses, EndpointIds, or owners. In version 1 it is consumed at build time
+and is not downloaded or refreshed by nodes at runtime.
+
+An endpoint's ownership assignment and a node's observed EntityIds are supplied
+by firmware configuration or another persistent local configuration mechanism.
+Build tooling resolves registry aliases and embeds the resulting numeric values.
+A node MUST NOT advertise an entity that is absent from its active local
+configuration.
+
+This specification does not assign a generic `CONFIG_SET` key for transferring
+entity ownership. A published endpoint profile MAY later define a persistent
+key, but it must also define commissioning authorization, conflict handling,
+activation timing, and how the previous assignment is withdrawn. Automated
+entity allocation and distribution remain outside version 1.
+
 == CONFIG_GET
 
 [cols="1,2,4",options="header"]
@@ -80,4 +99,3 @@ traffic.
 
 Security-sensitive deployments SHOULD require a local commissioning input or a
 short commissioning window before accepting `CONFIG_SET` or `ADDRESS_ASSIGN`.
-

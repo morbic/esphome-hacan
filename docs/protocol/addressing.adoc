@@ -28,9 +28,11 @@ used as a destination.
 A commissioned node MUST use the same address on all of its CAN interfaces. No
 two commissioned nodes in one routed HACAN installation may share an address.
 
-Node addresses describe protocol identity, not physical position. They MUST NOT
-encode a room, branch, device class, or bridge path. This permits physical
-topology changes without changing application bindings.
+Node addresses are short transport locators, not physical or semantic identity.
+They MUST NOT encode a room, branch, device class, or bridge path. A node
+normally reuses its persisted address but MAY receive another address during
+recommissioning or conflict recovery. Logical application bindings use
+EntityIds and therefore survive a NodeAddress change.
 
 == Endpoint address space
 
@@ -54,8 +56,8 @@ Endpoint identifiers are unsigned 8-bit values carried in applicable payloads.
 |===
 
 Endpoint identifiers SHOULD remain stable across compatible firmware updates.
-Changing an endpoint identifier breaks stored bindings even when the node
-address is unchanged.
+Changing an endpoint identifier requires the owning node to advertise its
+EntityId assignment again and invalidates direct physical bindings.
 
 Version 1 prohibits a `COMMAND` to endpoint `0xFF`. A sender must address every
 command target explicitly. This avoids unintended operation when firmware adds
@@ -77,6 +79,11 @@ The six UID bytes are transmitted least-significant byte first, consistently
 with the byte-order rules in xref:data-types.adoc[Data types]. The source of a
 UID and any privacy implications MUST be documented by an implementation.
 
+Observers may learn `Node UID <-> NodeAddress` mappings from `ADDRESS_CLAIM` and
+discovery for commissioning, address-conflict handling, and diagnostics. The
+entity directory uses the source NodeAddress directly and does not contain a
+Node UID. A NodeAddress is not a second permanent device identifier.
+
 == Broadcast rules
 
 Broadcast is intended for discovery, address assignment, announcements, time
@@ -86,4 +93,3 @@ the message definition specifies a randomized reply procedure.
 
 Broadcast `COMMAND` is not valid in version 1. Application fan-out uses a
 broadcast `EVENT` or explicit unicast commands according to installation policy.
-

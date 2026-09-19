@@ -2,7 +2,7 @@
 :toc: left
 :sectnums:
 
-HACAN (Home Automation over CAN) is a proposed protocol and implementation
+HACAN (Home Automation over CAN) is a draft protocol and implementation
 foundation for distributed home automation over CAN.
 
 == Documentation
@@ -13,6 +13,6 @@ foundation for distributed home automation over CAN.
 
 == Status
 
-The protocol documents currently describe a proposed version 1 baseline. The
-architecture decision records identify the choices that require review before
-the first codec implementation begins.
+The architecture decisions for the version 1 baseline are accepted. The
+protocol remains a draft until its first implementation is validated in a
+representative physical installation.
