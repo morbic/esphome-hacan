@@ -1,0 +1,89 @@
+= Addressing
+:toc: left
+:sectnums:
+
+== Node address space
+
+The source and destination fields are unsigned 9-bit values.
+
+[cols="1,2,4",options="header"]
+|===
+|Value |Name |Meaning
+
+|`0x000`
+|Unassigned
+|A node that has no commissioned address. Valid only as a source for the
+commissioning messages explicitly listed in this specification. It MUST NOT be
+used as a destination.
+
+|`0x001` to `0x1FE`
+|Unicast
+|510 installation-wide node addresses.
+
+|`0x1FF`
+|Broadcast
+|All nodes. Valid only as a destination.
+|===
+
+A commissioned node MUST use the same address on all of its CAN interfaces. No
+two commissioned nodes in one routed HACAN installation may share an address.
+
+Node addresses describe protocol identity, not physical position. They MUST NOT
+encode a room, branch, device class, or bridge path. This permits physical
+topology changes without changing application bindings.
+
+== Endpoint address space
+
+Endpoint identifiers are unsigned 8-bit values carried in applicable payloads.
+
+[cols="1,2,4",options="header"]
+|===
+|Value |Name |Meaning
+
+|`0x00`
+|Node endpoint
+|The node itself, used for node-level requests and configuration.
+
+|`0x01` to `0xFE`
+|Function endpoint
+|A node-local sensor, input, output, actuator, or logical function.
+
+|`0xFF`
+|Endpoint wildcard
+|All endpoints, only where a message definition explicitly permits it.
+|===
+
+Endpoint identifiers SHOULD remain stable across compatible firmware updates.
+Changing an endpoint identifier breaks stored bindings even when the node
+address is unchanged.
+
+Version 1 prohibits a `COMMAND` to endpoint `0xFF`. A sender must address every
+command target explicitly. This avoids unintended operation when firmware adds
+new endpoints.
+
+== Stable node identifier
+
+Every node MUST also have an immutable 48-bit Node UID. The Node UID is used
+during commissioning and conflict resolution; it is not placed in normal
+traffic.
+
+The Node UID MUST be globally unique with a sufficiently low collision risk. An
+IEEE-assigned EUI-48 or a value derived from a factory-programmed unique silicon
+identifier is suitable. A random value generated on every boot is not suitable.
+If a random value is provisioned, it MUST be generated once with an appropriate
+source of randomness and stored persistently.
+
+The six UID bytes are transmitted least-significant byte first, consistently
+with the byte-order rules in xref:data-types.adoc[Data types]. The source of a
+UID and any privacy implications MUST be documented by an implementation.
+
+== Broadcast rules
+
+Broadcast is intended for discovery, address assignment, announcements, time
+synchronization, and explicit application fan-out. A receiver MUST NOT send an
+`ACK`, `RESPONSE`, or `PROTOCOL_ERROR` directly in response to a broadcast unless
+the message definition specifies a randomized reply procedure.
+
+Broadcast `COMMAND` is not valid in version 1. Application fan-out uses a
+broadcast `EVENT` or explicit unicast commands according to installation policy.
+

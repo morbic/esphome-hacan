@@ -1,0 +1,43 @@
+= Security model
+:toc: left
+:sectnums:
+
+== Version 1 trust boundary
+
+HACAN version 1 provides no source authentication, message integrity beyond the
+CAN CRC, confidentiality, authorization exchange, or replay protection across
+restarts. CAN error detection protects against transmission faults, not a node
+that intentionally sends valid frames.
+
+Anyone able to attach an active CAN controller to a segment can observe traffic,
+claim addresses, send commands, change configuration on accepting nodes, or
+create denial of service through dominant traffic. Active bridges extend this
+trust boundary unless they implement installation-specific filtering.
+
+== Required deployment posture
+
+Version 1 is suitable only where the CAN wiring and every attached node are
+inside the installation's physical trust boundary. Installations SHOULD:
+
+* keep external or publicly accessible wiring on a separately filtered segment;
+* require a physical input or short local window for address assignment and
+  persistent configuration;
+* disable debug interfaces and protect firmware update mechanisms;
+* monitor address conflicts, route movement, error counters, and bus load;
+* define local safe behavior for loss or corruption of communication.
+
+These controls mitigate risk but do not turn version 1 into an authenticated
+protocol.
+
+== Future security profile
+
+Adding authentication is an open architectural decision. A future design must
+address key provisioning, multicast authentication, replay windows, boot
+counters, truncated tag strength, bridge behavior, recovery, and the limited
+eight-byte Classical CAN payload. It may require CAN FD or a separately defined
+segmented transport.
+
+No implementation may claim HACAN-level security by placing undocumented bytes
+in reserved fields. Installation-specific CAN filtering or secure boot may be
+valuable, but is outside the version 1 wire protocol.
+

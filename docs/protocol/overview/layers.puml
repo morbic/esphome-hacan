@@ -1,0 +1,16 @@
+@startuml
+skinparam backgroundColor transparent
+skinparam componentStyle rectangle
+
+rectangle "Application\nlocal automation / gateway / UI" as app
+rectangle "HACAN semantics\nendpoints, values, commands, discovery" as protocol
+rectangle "HACAN frame profile\n29-bit identifier + 8-byte payload" as framing
+rectangle "Classical CAN\narbitration, CRC, ACK, retry" as can
+rectangle "ISO 11898-2 segment" as phy
+
+app -down-> protocol
+protocol -down-> framing
+framing -down-> can
+can -down-> phy
+@enduml
+

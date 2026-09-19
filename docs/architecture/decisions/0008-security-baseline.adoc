@@ -1,0 +1,32 @@
+= HACAN-ADR-0008: Define version 1 as a physically trusted protocol
+
+Status: *Proposed*
+
+== Context
+
+Commands and configuration can affect a building. Strong authentication within
+an eight-byte Classical CAN payload needs key provisioning, replay state,
+truncated tags, multicast rules, and likely segmentation. A superficially small
+security field would create misleading guarantees.
+
+== Considered options
+
+* No explicit model: simplest text, but users may assume protections that do
+  not exist.
+* Ad hoc shared-key tag in each frame: limited tag strength and payload, no
+  defined provisioning or restart replay protection.
+* Explicit physical-trust baseline followed by a designed security profile:
+  honest and implementable, but unsuitable for exposed wiring.
+
+== Decision
+
+Version 1 assumes every attached node and segment is physically trusted and
+states that it has no protocol authentication or confidentiality. Commissioning
+mode and segment filtering are deployment mitigations, not cryptographic claims.
+
+== Consequences
+
+The baseline is appropriate only for protected building wiring. External
+segments require isolation or filtering. A future authenticated profile needs a
+dedicated ADR and may select CAN FD or a bounded segmented transport.
+

@@ -1,0 +1,43 @@
+= HACAN architecture decision records
+:toc: left
+
+[cols="1,4,1",options="header"]
+|===
+|ID |Decision |Status
+
+|HACAN-ADR-0001
+|xref:0001-classical-can.adoc[Use Classical CAN 2.0B for protocol version 1]
+|Proposed
+
+|HACAN-ADR-0002
+|xref:0002-extended-identifier.adoc[Use one extended identifier layout with global node addresses]
+|Proposed
+
+|HACAN-ADR-0003
+|xref:0003-fixed-payload.adoc[Use fixed eight-byte typed messages without fragmentation]
+|Proposed
+
+|HACAN-ADR-0004
+|xref:0004-communication-model.adoc[Use event-driven mixed communication and selective ACK]
+|Proposed
+
+|HACAN-ADR-0005
+|xref:0005-discovery-addressing.adoc[Commission stable addresses using a 48-bit Node UID]
+|Proposed
+
+|HACAN-ADR-0006
+|xref:0006-active-bridges.adoc[Use active bridges and one global address space]
+|Proposed
+
+|HACAN-ADR-0007
+|xref:0007-versioning.adoc[Version registries conservatively and ignore compatible extensions]
+|Proposed
+
+|HACAN-ADR-0008
+|xref:0008-security-baseline.adoc[Define version 1 as a physically trusted protocol]
+|Proposed
+|===
+
+ADR identifiers are permanent. When a decision changes, its record is marked
+superseded and links to the replacement; identifiers are never reused.
+

@@ -1,0 +1,83 @@
+= Configuration
+:toc: left
+:sectnums:
+
+== Configuration model
+
+Configuration is a set of typed keys scoped to a node endpoint. Endpoint zero
+contains node-wide keys; function endpoints contain function-specific keys.
+Keys are unsigned 8-bit values and are defined by published endpoint profiles
+or by an implementation.
+
+Protocol version 1 deliberately supports only atomic access to one scalar key.
+It does not define configuration files, multi-key transactions, strings, or
+fragmentation. Runtime actions and temporary values use `COMMAND`, not
+`CONFIG_SET`.
+
+== CONFIG_GET
+
+[cols="1,2,4",options="header"]
+|===
+|Byte |Field |Meaning
+|B0 |Transaction |Requester-selected transaction.
+|B1 |Endpoint |`0x00..0xFE`.
+|B2 |Key |Endpoint-local key.
+|B3..B7 |Reserved |Zero.
+|===
+
+The target replies with exactly one `CONFIG_VALUE` or `PROTOCOL_ERROR`.
+
+== CONFIG_SET
+
+[cols="1,2,4",options="header"]
+|===
+|Byte |Field |Meaning
+|B0 |Transaction |Requester-selected transaction, retained by retries.
+|B1 |Endpoint |`0x00..0xFE`.
+|B2 |Key |Endpoint-local key.
+|B3 |Data type |Type of the value.
+|B4..B7 |Value |Typed value slot.
+|===
+
+Every `CONFIG_SET` requires an `ACK`; there is no flag to disable it. The target
+validates type, range, permissions, and cross-key constraints before changing
+the active value. `ACCEPTED` means the new value is active and, for a persistent
+key, durably stored. A device MUST NOT acknowledge before a required persistent
+write succeeds.
+
+The receiver applies the same at-most-once and duplicate-ACK behavior as for
+`COMMAND`. Retrying uses the same transaction. Implementations SHOULD avoid a
+physical flash write when the stored typed value is unchanged.
+
+Whether a key is read-only, persistent, requires a restart, or affects safety is
+part of its profile definition. Version 1 has no generic `commit` or `reboot`
+message. A key requiring restart MUST NOT be introduced without documenting how
+the active and stored values are reported.
+
+== CONFIG_VALUE
+
+[cols="1,2,4",options="header"]
+|===
+|Byte |Field |Meaning
+|B0 |Transaction |Copied from `CONFIG_GET`.
+|B1 |Endpoint |Requested endpoint.
+|B2 |Key |Requested key.
+|B3 |Data type |Type of the value.
+|B4..B7 |Value |Typed value slot.
+|===
+
+An unknown endpoint or key produces `PROTOCOL_ERROR` with status
+`UNSUPPORTED`. A temporarily unreadable value produces status `FAULT`. Invalid
+responses are not represented using magic values in the value slot.
+
+== Configuration ownership
+
+HACAN does not define a single configuration owner. Concurrent managers can
+overwrite one another, so an installation SHOULD designate one manager or
+coordinate access outside the protocol. Configuration changes SHOULD be rare
+and MUST be rate-limited to avoid flash wear and interference with operational
+traffic.
+
+Security-sensitive deployments SHOULD require a local commissioning input or a
+short commissioning window before accepting `CONFIG_SET` or `ADDRESS_ASSIGN`.
+

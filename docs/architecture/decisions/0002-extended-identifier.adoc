@@ -1,0 +1,36 @@
+= HACAN-ADR-0002: Use one extended identifier layout with global node addresses
+
+Status: *Proposed*
+
+== Context
+
+The expected installation exceeds the comfortable address and message space of
+an 11-bit identifier. Arbitration should distinguish urgent commands from
+discovery and carry source and destination without spending payload bytes.
+
+== Considered options
+
+* 11-bit identifiers: slightly lower frame overhead and priority against
+  extended frames, but insufficient for source, destination, kind, and routing.
+* 29-bit identifiers: enough space for explicit fields at modest overhead.
+* Support both: introduces gateway and filter ambiguity without a required
+  legacy format.
+
+Address widths of 8, 9, and 10 bits were considered. Eight bits leave little
+growth beyond the stated 200 nodes. Ten bits leave no practical hop counter with
+the required priority and kind fields. Nine bits balance both needs.
+
+== Decision
+
+Use only 29-bit identifiers with 3 priority bits, 5 kind bits, 9 destination
+bits, 9 source bits, and 3 bridge-hop bits. Addresses are global and do not
+encode topology.
+
+== Consequences
+
+The installation supports 510 commissioned nodes and seven bridge crossings.
+Acceptance filters can select kinds or destinations. Extended frames consume
+more bus time than standard frames. Mixed non-HACAN traffic requires explicit
+installation planning because standard identifiers win arbitration over an
+extended identifier with the same 11-bit base.
+

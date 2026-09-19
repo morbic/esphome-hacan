@@ -1,0 +1,33 @@
+= HACAN-ADR-0004: Use event-driven mixed communication and selective ACK
+
+Status: *Proposed*
+
+== Context
+
+Inputs and sensors naturally publish changes, while commands and metadata need
+directed exchanges. Acknowledging every frame wastes capacity; never using an
+application ACK makes non-idempotent commands hard to reason about. CAN's ACK
+slot does not indicate application execution.
+
+== Considered options
+
+* Pure publish/subscribe: efficient state distribution, weak for commands and
+  commissioning.
+* Pure request/response: simple ownership, but introduces polling and central
+  dependence.
+* ACK every message: clear delivery feedback at excessive traffic and state
+  cost.
+* Selective ACK: added duplicate cache, but bounded reliability where needed.
+
+== Decision
+
+Use change-driven `STATE` and `EVENT`, directed `COMMAND`, and bounded
+request/response. ACK is requested only by eligible unicast operations;
+configuration writes always require it. Retries are bounded and deduplicated.
+
+== Consequences
+
+Normal bus load remains low and nodes can cooperate without a central server.
+Command receivers retain a small transaction cache. Applications must treat
+published state, rather than ACK, as authoritative physical state.
+

@@ -1,0 +1,121 @@
+= Discovery and commissioning
+:toc: left
+:sectnums:
+
+== Overview
+
+Discovery reports nodes already present on the installation. Commissioning
+assigns a stable address to a Node UID. These operations do not require a
+permanently online controller, but assigning addresses requires a temporary
+commissioning manager.
+
+[plantuml,commissioning,svg]
+....
+include::overview/commissioning.puml[]
+....
+
+== Discovery request and response
+
+`DISCOVERY_REQUEST` is broadcast by a commissioned requester:
+
+[cols="1,2,4",options="header"]
+|===
+|Byte |Field |Meaning
+|B0 |Transaction |Chosen by requester.
+|B1 |Flags |Bit 0 include commissioned; bit 1 include unassigned; bit 2 request
+`ANNOUNCE`; others zero.
+|B2..B3 |Window |Response window in milliseconds, `UINT16`; 1000..10000.
+|B4..B7 |Challenge |Requester-selected `UINT32` used to spread responses.
+|===
+
+Each matching node schedules exactly one response within the requested window.
+The delay SHOULD be a deterministic hash of Node UID and challenge modulo the
+window, plus small local timer jitter. This makes retries with a new challenge
+redistribute collisions.
+
+`DISCOVERY_RESPONSE` is sent to the requester. A commissioned node uses its
+normal source address. An unassigned node uses source zero.
+
+[cols="1,2,4",options="header"]
+|===
+|Byte |Field |Meaning
+|B0 |Transaction |Copied from request.
+|B1..B6 |Node UID |48-bit stable identifier, least-significant byte first.
+|B7 |Capabilities |Same bits as `ANNOUNCE`.
+|===
+
+The CAN arbitration behavior of two source-zero responses with the same CAN
+identifier is not a collision-resolution protocol. Random response timing is
+mandatory. A manager SHOULD repeat discovery with a new challenge when bus
+errors occur or responses are expected to be incomplete.
+
+== Address assignment
+
+`ADDRESS_ASSIGN` is broadcast and has no transaction byte because all 64 payload
+bits are used:
+
+[cols="1,2,4",options="header"]
+|===
+|Byte |Field |Meaning
+|B0..B5 |Node UID |Target stable identifier.
+|B6 |Address low |Low eight bits of assigned address.
+|B7 bit 0 |Address high |Bit 8 of assigned address.
+|B7 bits 1..7 |Flags |Bit 1 `PERSIST`; all other bits zero.
+|===
+
+Only addresses `0x001..0x1FE` are valid. `PERSIST` MUST be set in version 1; a
+node stores the address in non-volatile memory before claiming it. Repeating an
+identical assignment is idempotent. A node whose UID does not match ignores the
+frame.
+
+Version 1 does not authenticate a commissioning manager. Physical access and an
+installation commissioning mode are therefore RECOMMENDED; see
+xref:security.adoc[Security model].
+
+== Address claim
+
+After loading or accepting an address, a node waits a UID-derived 0 to 2000 ms
+delay and broadcasts `ADDRESS_CLAIM` using the claimed address as its source:
+
+[cols="1,2,4",options="header"]
+|===
+|Byte |Field |Meaning
+|B0..B5 |Node UID |Claimant stable identifier.
+|B6 |Protocol major |Claimant protocol major.
+|B7 |Claim nonce |Low byte of a UID/boot-token hash; collision spreading only.
+|===
+
+A node sends two claims separated by 250 to 500 ms of UID-derived jitter. It
+MUST accept normal addressed traffic only after this claim period finishes
+without losing conflict resolution. It then sends `ANNOUNCE` and its initial
+state snapshot as described in xref:diagnostics.adoc[Diagnostics].
+
+All nodes and bridges SHOULD observe claims. Seeing two UIDs use one source
+address establishes a conflict. An observer sends `ADDRESS_CONFLICT` to that
+address:
+
+[cols="1,2,4",options="header"]
+|===
+|Byte |Field |Meaning
+|B0..B5 |Winning UID |Numerically lower of the two UIDs.
+|B6 |Reason |`0x01` duplicate address; other values reserved.
+|B7 |Sequence |Observer sequence value.
+|===
+
+The numerically lower UID deterministically retains the address. A claimant
+with a higher UID withdraws immediately to address zero, stops normal traffic,
+sets `configuration required`, and waits for a new assignment. The lower UID
+repeats its claim after a randomized delay. This rule restores communication;
+it does not authorize automatic selection of a new address.
+
+A node that observes an `ADDRESS_CLAIM` from another UID using its own address
+applies the same comparison even if no observer sends `ADDRESS_CONFLICT`.
+
+== Removal and address changes
+
+There is no remote address-release message in version 1. A commissioning tool
+changes an address by sending `ADDRESS_ASSIGN` for the same UID. The node stops
+normal traffic, persists the new address, and repeats the claim procedure.
+
+Factory reset and deletion of commissioning state are implementation-specific
+local operations. They MUST NOT be triggered by an undocumented CAN payload.

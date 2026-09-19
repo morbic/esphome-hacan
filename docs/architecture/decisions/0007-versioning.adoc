@@ -1,0 +1,30 @@
+= HACAN-ADR-0007: Version registries conservatively and ignore compatible extensions
+
+Status: *Proposed*
+
+== Context
+
+Installed embedded nodes may remain in service for years. The protocol needs to
+add capabilities without requiring simultaneous firmware replacement or
+silently changing old meanings.
+
+== Considered options
+
+* Version bits in every frame: explicit, but consumes scarce identifier or
+  payload space forever.
+* Version only during lifecycle exchange plus stable registries: efficient, but
+  depends on strict unknown-value rules.
+* No formal version: initially simple and eventually ambiguous.
+
+== Decision
+
+Announce major and minor versions during lifecycle exchange. Preserve the base
+version 1 frame grammar, allocate new registry values monotonically, ignore
+unknown passive publications, and reject unknown directed operations safely.
+
+== Consequences
+
+Ordinary messages retain full payload capacity. Implementations need capability
+and unknown-value handling. An incompatible identifier grammar requires a major
+version design and may need a discriminator outside the current layout.
+

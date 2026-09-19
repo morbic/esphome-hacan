@@ -1,0 +1,174 @@
+= Examples and test vectors
+:toc: left
+:sectnums:
+
+== Notation
+
+Identifiers are 29-bit hexadecimal values. Payload bytes are listed from `B0`
+to `B7`. All examples have the extended-frame flag set, RTR clear, and DLC 8.
+They are normative encoding vectors for the proposed version 1 layout.
+
+== Boolean state publication
+
+Node `0x12A` publishes that endpoint `0x03` is true. Sequence is `0x2A`, type is
+`BOOL`, and quality is `VALID`. The destination is broadcast.
+
+----
+priority = 3, kind = STATE (0x08), destination = 0x1FF
+source = 0x12A, hop = 0
+CAN ID  = 0x0D1FF950
+data    = 2A 03 01 01 01 00 00 00
+----
+
+Decoder assertions:
+
+* identifier fields decode to exactly the values above;
+* the value consumes only B4 and unused bytes are zero;
+* changing B4 to `02` makes the `BOOL` payload invalid;
+* changing DLC to 7 makes the frame non-HACAN.
+
+== Acknowledged relay command
+
+Node `0x001` commands boolean endpoint `0x05` on node `0x12A` to turn on and
+requests application acknowledgement. Transaction is `0x34`.
+
+----
+priority = 1, kind = COMMAND (0x0A), destination = 0x12A
+source = 0x001, hop = 0
+CAN ID  = 0x0552A008
+data    = 34 05 01 01 01 00 00 00
+----
+
+The target accepts the command and replies:
+
+----
+priority = 1, kind = ACK (0x0D), destination = 0x001
+source = 0x12A, hop = 0
+CAN ID  = 0x05A01950
+data    = 34 05 0A 00 00 00 00 00
+----
+
+If the ACK crosses two bridges its identifier becomes `0x05A01952`; the
+payload and every identifier field except hop remain unchanged.
+
+If no ACK arrives, the sender may retransmit the command with data
+`34 05 01 03 01 00 00 00`: both `ACK_REQUIRED` and `RETRY` are set. The target
+must resend its cached ACK without applying the output twice.
+
+== State snapshot request
+
+Node `0x001` requests endpoint `0x05` state from node `0x12A`:
+
+----
+priority = 3, kind = REQUEST (0x0B), destination = 0x12A
+source = 0x001, hop = 0
+CAN ID  = 0x0D72A008
+data    = 40 05 01 00 00 00 00 00
+----
+
+The target publishes a unicast initial state. Its state sequence is independent
+of request transaction `0x40`:
+
+----
+priority = 3, kind = STATE (0x08), destination = 0x001
+source = 0x12A, hop = 0
+CAN ID  = 0x0D001950
+data    = 41 05 01 11 01 00 00 00
+----
+
+Quality `0x11` means `VALID | INITIAL`.
+
+== Discovery and commissioning
+
+Manager `0x001` broadcasts transaction `0x5C`, requests both commissioned and
+unassigned nodes, provides a 1000 ms response window, and challenge
+`0x12345678`:
+
+----
+CAN ID  = 0x107FF008
+data    = 5C 03 E8 03 78 56 34 12
+----
+
+An unassigned node with UID `0x665544332211` responds after its calculated
+delay. It advertises configuration, diagnostics, and local automation
+capabilities (`0x13`):
+
+----
+CAN ID  = 0x10801000
+data    = 5C 11 22 33 44 55 66 13
+----
+
+The manager persistently assigns address `0x12A`. The high address bit and
+`PERSIST` flag form B7 value `0x03`:
+
+----
+CAN ID  = 0x10DFF008
+data    = 11 22 33 44 55 66 2A 03
+----
+
+The node claims the address with protocol major 1 and example nonce `0x7C`:
+
+----
+CAN ID  = 0x10BFF950
+data    = 11 22 33 44 55 66 01 7C
+----
+
+After completing claims, an example announcement with boot token `0x12345678`
+is:
+
+----
+CAN ID  = 0x103FF950
+data    = 01 01 00 13 78 56 34 12
+----
+
+== Required negative vectors
+
+A codec test suite should reject or ignore, as specified:
+
+[cols="3,4",options="header"]
+|===
+|Mutation |Expected result
+
+|Use a standard 11-bit identifier with an otherwise matching payload
+|Ignore as non-HACAN.
+
+|Use RTR or CAN FD
+|Ignore as non-HACAN version 1.
+
+|Use DLC other than 8
+|Increment malformed count; do not dispatch.
+
+|Set source to `0x1FF` or destination to zero
+|Reject address fields.
+
+|Originate a frame with non-zero hop
+|Implementation transmit validation fails.
+
+|Send broadcast `COMMAND`
+|Reject without an error reply.
+
+|Set reserved `COMMAND` flag bit 7
+|Reject directed command as invalid; do not execute.
+
+|Encode `BOOL` as `02`
+|Reject typed value as invalid.
+
+|Send unknown message kind `0x14`
+|Ignore and increment `rx_unknown_kind`.
+
+|Forward a frame whose hop is 7
+|Drop and increment `route_hop_limit_drops`.
+
+|Repeat the acknowledged command transaction within two seconds
+|Return the cached ACK and execute at most once.
+|===
+
+== Suggested conformance test groups
+
+The future codec test suite should cover identifier round trips for every field
+boundary, every data type at minimum and maximum values, reserved-bit
+validation, sequence wrap from `0xFF` to `0x00`, duplicate commands, changed
+boot tokens, discovery jitter bounds, deterministic conflict winners, route
+learning and expiry, hop exhaustion, queue overload, and unknown minor-version
+extensions.
+

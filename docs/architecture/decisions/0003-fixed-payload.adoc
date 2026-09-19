@@ -1,0 +1,31 @@
+= HACAN-ADR-0003: Use fixed eight-byte typed messages without fragmentation
+
+Status: *Proposed*
+
+== Context
+
+Small embedded nodes need predictable parsing and no dynamic allocation.
+Classical CAN provides at most eight data bytes, while configuration and
+firmware use cases could motivate reassembly.
+
+== Considered options
+
+* Fixed purpose-specific payloads: simplest validation and bounded state, but
+  limits values to four bytes and metadata to paged requests.
+* A universal type-length-value envelope: extensible, but envelope overhead
+  leaves too little useful data.
+* Generic fragmentation: carries arbitrary data, but adds buffers, timeouts,
+  interleaving, denial-of-service surface, and bridge load.
+
+== Decision
+
+All version 1 frames use DLC 8 and purpose-specific layouts. Scalar values use
+an explicit type and a four-byte value slot. Generic fragmentation is excluded.
+
+== Consequences
+
+The codec can be allocation-free and validate every message locally. Text,
+bulk data, and atomic multi-key configuration are unavailable. A future
+segmented transport requires a separate ADR and cannot reuse reserved values
+without defining resource and recovery rules.
+

@@ -1,0 +1,24 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    asciidoctor (2.0.26)
+    asciidoctor-diagram (3.2.1)
+      asciidoctor (>= 1.5.7, < 3.x)
+      rexml
+    asciidoctor-diagram-batik (1.19)
+    asciidoctor-diagram-plantuml (1.2026.2)
+      asciidoctor-diagram (~> 3.2, >= 3.2.1)
+      asciidoctor-diagram-batik (~> 1.17)
+    rexml (3.4.4)
+
+PLATFORMS
+  arm64-darwin-25
+  x86_64-linux
+
+DEPENDENCIES
+  asciidoctor (= 2.0.26)
+  asciidoctor-diagram (= 3.2.1)
+  asciidoctor-diagram-plantuml (= 1.2026.2)
+
+BUNDLED WITH
+   2.4.22

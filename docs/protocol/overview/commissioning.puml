@@ -1,0 +1,21 @@
+@startuml
+skinparam backgroundColor transparent
+
+participant "Commissioning manager\naddress 0x001" as manager
+participant "Unassigned node\nsource 0" as node
+participant "Other nodes / bridges" as peers
+
+manager -> node: DISCOVERY_REQUEST (broadcast, challenge)
+note right of node: UID-derived randomized delay
+node -> manager: DISCOVERY_RESPONSE (UID, source 0)
+manager -> node: ADDRESS_ASSIGN (broadcast, target UID, 0x12A)
+note right of node: Persist address, randomized claim delay
+node -> peers: ADDRESS_CLAIM x2 (source 0x12A)
+alt no conflict
+  node -> peers: ANNOUNCE (boot token)
+  node -> peers: initial STATE messages, paced
+else duplicate address observed
+  peers -> node: ADDRESS_CONFLICT (winning UID)
+  note right of node: Higher UID withdraws to source 0
+end
+@enduml

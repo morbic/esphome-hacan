@@ -1,0 +1,118 @@
+= Diagnostics, restart, and overload behavior
+:toc: left
+:sectnums:
+
+== Diagnostic access
+
+Diagnostics expose bounded scalar values. They are observational and MUST NOT
+change node behavior.
+
+`DIAGNOSTIC_REQUEST` and `DIAGNOSTIC_RESPONSE` use:
+
+[cols="1,2,2,3",options="header"]
+|===
+|Byte |Request |Response |Meaning
+|B0 |Transaction |Transaction |Copied unchanged.
+|B1 |Interface |Interface |Zero for node-wide; 1..254 implementation interfaces.
+|B2..B3 |Item |Item |Diagnostic item `UINT16`.
+|B4 |Zero |Status |Status registry value.
+|B5..B7 |Zero |Value |Unsigned 24-bit saturating value, little-endian.
+|===
+
+A response value saturates at `0xFFFFFF`; counters do not wrap. Unsupported
+interfaces or items return status `UNSUPPORTED` and value zero.
+
+== Standard diagnostic items
+
+[cols="1,2,4",options="header"]
+|===
+|Item |Name |Meaning
+|`0x0001` |`uptime_seconds` |Current boot uptime.
+|`0x0002` |`rx_frames` |Valid HACAN frames received.
+|`0x0003` |`tx_frames` |HACAN frames transmitted successfully.
+|`0x0004` |`rx_malformed` |Frames rejected by HACAN validation.
+|`0x0005` |`rx_unknown_kind` |Well-formed frames with unrecognized kind.
+|`0x0006` |`rx_duplicates` |Application or bridge duplicates suppressed.
+|`0x0007` |`tx_queue_drops` |Frames dropped by bounded transmit queues.
+|`0x0008` |`can_rx_errors` |CAN controller receive error counter or accumulated errors.
+|`0x0009` |`can_tx_errors` |CAN controller transmit error counter or accumulated errors.
+|`0x000A` |`can_bus_off_count` |Number of transitions to bus-off.
+|`0x000B` |`route_hop_limit_drops` |Frames dropped with hop seven.
+|`0x000C` |`route_moves` |Learned source routes that changed interface.
+|`0x000D` |`address_conflicts` |Conflicts detected for any address.
+|`0x000E` |`command_rejections` |Commands rejected after validation.
+|`0x000F` |`free_queue_slots` |Current aggregate transmit queue capacity.
+|`0x0010` to `0x7FFF` |Reserved |Future standard items.
+|`0x8000` to `0xFFFF` |Vendor-specific |Meaning defined by implementation.
+|===
+
+For CAN controller counters whose native meaning differs by controller, an
+implementation MUST document whether the value is current, accumulated, or
+unavailable. It MUST return `UNSUPPORTED` instead of inventing a value.
+
+== Restart sequence
+
+A commissioned node performs the following sequence after restart:
+
+. initialize CAN and generate a new non-zero boot token;
+. wait the claim jitter and complete address claiming;
+. broadcast `ANNOUNCE`;
+. accept addressed application traffic;
+. publish initial endpoint states with `INITIAL` set, spread over a UID-derived
+  start window of 0 to 5000 ms and paced at no more than 10 frames per second;
+. begin the jittered heartbeat schedule.
+
+An unassigned node remains silent except for randomized discovery responses and
+address commissioning. It MUST NOT originate application messages.
+
+Receiving a changed boot token invalidates cached transactions and prior state
+freshness for that source. Consumers SHOULD mark required values stale until
+new states arrive. A node MUST NOT assume that a remote output retained its
+pre-restart state.
+
+Reset reason is useful but not included in every announcement. Implementations
+MAY expose it as a diagnostic vendor item until a standard item is assigned.
+
+== Loss of communication
+
+The protocol reports liveness but does not prescribe one universal fail-safe
+action. Each actuator profile or installation configuration must define one of
+the following, or another explicit policy:
+
+* retain last output;
+* move to a configured safe value after a timeout;
+* continue local rules while rejecting remote assumptions;
+* require an explicit command after the peer returns.
+
+The timeout and action are local behavior. Nodes SHOULD expose degraded or fault
+state when a required peer is unavailable.
+
+== Load control
+
+Nodes MUST apply these traffic rules:
+
+* publish state on meaningful change, request, or restart, not on a fast fixed
+  interval;
+* debounce physical contacts locally;
+* apply deadband and minimum publication interval to noisy analog values;
+* pace wildcard state responses and startup snapshots;
+* randomize discovery, claims, announcements, and heartbeats as specified;
+* bound retries, queues, and diagnostic response rates;
+* coalesce superseded unsent `STATE` values for the same endpoint where safe;
+* never coalesce distinct `EVENT` messages or commands.
+
+An installation SHOULD target less than 30 percent sustained utilization on
+each segment, leaving arbitration capacity for bursts and CAN error recovery.
+This is an engineering target, not a decoder validity rule.
+
+Priority 0 is reserved for a future emergency profile and MUST NOT be used by
+version 1 messages. Nodes must not raise routine traffic above its registered
+priority. Under congestion, diagnostics and commissioning yield to commands,
+events, and state synchronization.
+
+== CAN controller errors
+
+CAN controller retransmission remains enabled. On bus-off, a node follows its
+controller and platform recovery requirements, increments the bus-off counter,
+and does not busy-loop recovery attempts. After recovery it repeats the normal
+address claim and announcement sequence so peers can invalidate stale state.

@@ -1,0 +1,115 @@
+= Frame format
+:toc: left
+:sectnums:
+
+== Extended CAN identifier
+
+HACAN uses all 29 bits of an extended CAN identifier.
+
+[cols="2,1,1,2,5",options="header"]
+|===
+|Field |Bits |Width |Mask |Purpose
+
+|Priority
+|28..26
+|3
+|`0x1C000000`
+|Arbitration priority; zero is highest.
+
+|Kind
+|25..21
+|5
+|`0x03E00000`
+|Message kind registry value.
+
+|Destination
+|20..12
+|9
+|`0x001FF000`
+|Unicast node or `0x1FF` broadcast.
+
+|Source
+|11..3
+|9
+|`0x00000FF8`
+|Originating node or, where permitted, zero for unassigned.
+
+|Hop
+|2..0
+|3
+|`0x00000007`
+|Number of active bridge crossings.
+|===
+
+The numeric identifier is calculated as:
+
+----
+can_id = (priority << 26)
+       | (kind << 21)
+       | (destination << 12)
+       | (source << 3)
+       | hop
+----
+
+Because CAN arbitrates from the most significant identifier bit, priority is
+the first arbitration field. A sender MUST use the default priority assigned to
+the message kind unless that message definition explicitly permits another
+value. Priority is not an application quality-of-service control.
+
+[cols="1,2,4",options="header"]
+|===
+|Value |Class |Use
+|0 |Emergency reserved |Reserved for a future safety profile; unused by v1.
+|1 |Control |Commands, acknowledgements, conflicts, and protocol errors.
+|2 |Events |Application occurrences.
+|3 |State and query |State publications and bounded request/response.
+|4 |Management |Lifecycle, discovery, configuration, and time.
+|5 |Diagnostics |Diagnostic request/response.
+|6 |Bulk reserved |Reserved for a future bounded transport.
+|7 |Background reserved |Reserved for a future profile.
+|===
+
+An originating node MUST set `hop` to zero. An active bridge increments it
+before transmission on another segment. A bridge MUST drop a frame whose hop is
+already seven and increment its `route_hop_limit_drops` diagnostic counter.
+
+== Data field
+
+Every version 1 frame has DLC 8. Bytes are named `B0` through `B7`. Payload
+layouts are defined per message kind; there is no hidden common header.
+
+Unused and reserved bits and bytes MUST be transmitted as zero. A receiver MUST
+ignore reserved fields unless a later compatible specification assigns them.
+A receiver MUST reject a frame when a field required to be zero is non-zero if
+interpreting it could cause an unsafe command or configuration change.
+
+== Validation order
+
+A receiver SHOULD validate a frame in this order:
+
+. extended Classical CAN data frame and DLC 8;
+. identifier field ranges and source/destination legality;
+. known message kind and allowed priority;
+. payload reserved fields, data type, and message-specific constraints;
+. destination and endpoint applicability;
+. duplicate and transaction handling;
+. application execution.
+
+Malformed broadcast frames are silently discarded and counted. For malformed
+unicast frames, a receiver MAY return `PROTOCOL_ERROR` if doing so cannot create
+an error loop. `PROTOCOL_ERROR`, `ACK`, and `RESPONSE` messages never cause an
+automatic error response.
+
+== Sequence and transaction identifiers
+
+Most message payloads contain an 8-bit sequence or transaction identifier in
+`B0`. A source increments its sequence modulo 256. It MUST NOT reuse the same
+`(kind, destination, sequence)` tuple within two seconds.
+
+A retried command or request uses the original transaction value. A new
+operation uses a new value. Messages whose layouts do not contain a sequence
+are explicitly idempotent or use another collision-avoidance rule.
+
+Sequence values order messages only within a known boot session. They are not a
+clock and MUST NOT be compared across a node restart. The boot token announced
+in `ANNOUNCE` and repeated in `HEARTBEAT` identifies a boot session.

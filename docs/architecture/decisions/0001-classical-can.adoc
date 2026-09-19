@@ -1,0 +1,30 @@
+= HACAN-ADR-0001: Use Classical CAN 2.0B for protocol version 1
+
+Status: *Proposed*
+
+== Context
+
+The first implementation targets ESP32 hardware and ESPHome-supported CAN
+controllers. Nodes need small bounded messages and broad controller/transceiver
+availability. The protocol may later carry richer configuration or updates.
+
+== Considered options
+
+* Classical CAN only: widest availability and deterministic eight-byte resource
+  bound, but no efficient bulk transfer.
+* CAN FD only: larger payload and higher data phase, but excludes common
+  controllers and complicates long building segments.
+* Dual Classical CAN and CAN FD from version 1: flexible, but creates two frame
+  profiles and interoperability modes before a bulk use case is specified.
+
+== Decision
+
+Protocol version 1 uses Classical CAN 2.0B data frames, nominally 125 kbit/s,
+with normal controller retransmission. CAN FD is reserved for a future ADR.
+
+== Consequences
+
+Every application payload is at most eight bytes. Version 1 cannot transfer
+long names, firmware, certificates, or arbitrary configuration. The initial
+codec and tests have one data-link mode. Hardware selection remains broad.
+

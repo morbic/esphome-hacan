@@ -1,0 +1,44 @@
+= HACAN architecture overview
+:toc: left
+:sectnums:
+
+== System context
+
+HACAN separates the wire protocol from integrations. The protocol specification
+defines interoperable CAN frames. An ESPHome external component will be the
+first implementation, but ESPHome entities and YAML are not protocol concepts.
+
+The expected installation contains 100 to 200 embedded nodes, one to four main
+controller or actuator devices, and optional active bridges to downstream CAN
+segments. All commissioned nodes share one logical address space and may
+communicate peer to peer.
+
+== Boundaries
+
+The protocol layer owns identifier encoding, payload validation, discovery,
+transactions, duplicate handling, forwarding rules, and diagnostics. Device
+profiles own endpoint meaning, ranges, units, configuration keys, and failure
+policy. Implementations own scheduling, storage, driver integration, and local
+automation rules.
+
+An ESPHome integration will translate profiles and endpoints into ESPHome
+entities. That mapping must not redefine wire values or make ESPHome behavior a
+requirement for other implementations.
+
+== Proposed baseline
+
+The proposed version 1 baseline is Classical CAN 2.0B at 125 kbit/s with 29-bit
+identifiers and fixed eight-byte payloads. It provides 510 global node addresses,
+254 function endpoints per node, mixed event and request/response messaging,
+selective application ACK, and up to seven active bridge crossings.
+
+The rationale, rejected alternatives, and consequences are in
+xref:decisions/index.adoc[Architecture decision records]. All initial records
+remain `Proposed` until reviewed and accepted.
+
+== Next implementation boundary
+
+After accepting the baseline decisions, the next increment should implement a
+standalone allocation-free frame codec plus host unit tests for every vector in
+the protocol examples. ESPHome code generation and entities should build on
+that tested codec rather than mixing bit manipulation with platform callbacks.

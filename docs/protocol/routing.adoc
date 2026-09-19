@@ -1,0 +1,84 @@
+= Multi-segment routing
+:toc: left
+:sectnums:
+
+== Topology
+
+HACAN branching uses active store-and-forward bridges. Each bridge interface is
+attached to a separate, correctly terminated CAN segment. The logical routed
+topology MUST be a tree: there is exactly one path between any two segments.
+
+A bridge designates one interface as upstream and zero or more interfaces as
+downstream. This designation is local configuration; it is not encoded in node
+addresses. Multiple root controller nodes may share the upstream segment.
+
+The hop field and duplicate cache contain accidental forwarding loops, but do
+not make a cyclic topology supported. Passive cross-connections between
+segments can also violate CAN electrical constraints and must be treated as an
+installation fault.
+
+== Forwarding rules
+
+For every valid received frame a bridge:
+
+. processes the frame locally if addressed to itself or broadcast;
+. consumes a unicast addressed to the bridge itself without forwarding it;
+. never transmits it back through the ingress interface;
+. drops it if its normalized fingerprint was recently observed on a different
+  interface;
+. drops and counts it if hop equals seven;
+. increments hop by one for every forwarded copy;
+. forwards broadcast frames to every other interface;
+. forwards known unicast destinations only through the learned interface;
+. floods an unknown unicast through all other interfaces.
+
+Flooding unknown unicast is necessary before routes are learned and remains
+bounded by the tree and hop limit. A bridge MUST NOT change priority, kind,
+source, destination, DLC, or payload.
+
+== Route learning
+
+A bridge learns `source address -> ingress interface` from every valid frame
+whose source is commissioned. `ADDRESS_CLAIM`, `ANNOUNCE`, and `HEARTBEAT`
+refresh the route. A route observed on another interface moves to that interface
+and increments `route_moves`; rapid repeated movement SHOULD set degraded status
+because it suggests a duplicate address or loop.
+
+Learned routes expire after 180 seconds without traffic. This value is longer
+than the heartbeat offline interval and allows stale paths to recover without a
+configuration transaction. Static routes MAY be provided by an implementation,
+but they MUST NOT contradict learned ownership silently.
+
+== Duplicate suppression
+
+The normalized fingerprint consists of priority, kind, destination, source,
+DLC, and all payload bytes; hop is excluded. Each entry also records ingress.
+Bridges retain recent fingerprints for at least 500 ms and at least 64 entries
+per interface. The same fingerprint returning on another interface is dropped
+and counted. A repeat arriving on the original ingress is forwarded again; it
+may be an application retry or a repeated idempotent commissioning message.
+
+Originating nodes are required to change message sequence values, so two valid
+occurrences should not have the same fingerprint inside this interval. The
+special messages without sequence values are idempotent. Duplicate suppression
+is a fault-containment mechanism, not a substitute for an acyclic topology.
+
+== Queues and priority
+
+A bridge SHOULD use bounded queues with separate admission for priorities 0..2
+so diagnostic or discovery bursts cannot prevent commands and events. Within a
+priority, CAN identifier order and then arrival order SHOULD be preserved.
+
+When a queue is full, a bridge drops the numerically highest-priority-value
+frame first (least urgent), increments a per-priority counter, and reports
+degraded status. It MUST NOT block reception while waiting for another segment.
+
+Segments MAY operate at different bit rates when the bridge has sufficient
+buffering, but the resulting load and latency must be validated. The default is
+125 kbit/s on every segment.
+
+== Bridge restart
+
+After restart a bridge has an empty route and duplicate cache. It announces
+itself normally and temporarily floods unknown unicast. Nodes do not need new
+addresses. Heartbeats and ordinary source traffic rebuild routes.

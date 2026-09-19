@@ -1,0 +1,264 @@
+= Message types
+:toc: left
+:sectnums:
+
+== Message kind registry
+
+[cols="1,2,1,2,3",options="header"]
+|===
+|Kind |Name |Priority |Destination |Purpose
+
+|`0x00` |`PROTOCOL_ERROR` |1 |Unicast |Reports a rejected or malformed operation.
+|`0x01` |`ANNOUNCE` |4 |Broadcast |Reports a boot session and protocol version.
+|`0x02` |`HEARTBEAT` |4 |Broadcast |Reports liveness and current boot token.
+|`0x03` |`DISCOVERY_REQUEST` |4 |Broadcast |Requests randomized identity responses.
+|`0x04` |`DISCOVERY_RESPONSE` |4 |Requester |Reports stable identity and capabilities.
+|`0x05` |`ADDRESS_CLAIM` |4 |Broadcast |Claims a commissioned address.
+|`0x06` |`ADDRESS_ASSIGN` |4 |Broadcast |Assigns an address to a Node UID.
+|`0x07` |`ADDRESS_CONFLICT` |1 |Conflicting address |Reports duplicate use of an address.
+|`0x08` |`STATE` |3 |Unicast or broadcast |Publishes an endpoint's current value.
+|`0x09` |`EVENT` |2 |Unicast or broadcast |Publishes a non-retained occurrence.
+|`0x0A` |`COMMAND` |1 |Unicast |Requests an endpoint action or value.
+|`0x0B` |`REQUEST` |3 |Unicast |Requests state or metadata.
+|`0x0C` |`RESPONSE` |3 |Requester |Returns requested state or metadata.
+|`0x0D` |`ACK` |1 |Requester |Acknowledges a unicast operation.
+|`0x0E` |`CONFIG_GET` |4 |Unicast |Reads one configuration key.
+|`0x0F` |`CONFIG_SET` |4 |Unicast |Writes one persistent configuration key.
+|`0x10` |`CONFIG_VALUE` |4 |Requester |Returns one configuration value.
+|`0x11` |`DIAGNOSTIC_REQUEST` |5 |Unicast |Reads one diagnostic item.
+|`0x12` |`DIAGNOSTIC_RESPONSE` |5 |Requester |Returns one diagnostic item.
+|`0x13` |`TIME_SYNC` |4 |Broadcast |Distributes optional wall-clock time.
+|`0x14` to `0x1F` |Reserved |-- |-- |Future compatible assignment.
+|===
+
+A receiver that does not recognize a reserved kind MUST ignore it and increment
+`rx_unknown_kind`. It MUST NOT interpret it as a known message.
+
+Except for an unassigned `DISCOVERY_RESPONSE`, every transmitted message has a
+commissioned source. `ADDRESS_CLAIM` uses the address being claimed as its
+source. `ANNOUNCE`, `HEARTBEAT`, `DISCOVERY_REQUEST`, `ADDRESS_CLAIM`,
+`ADDRESS_ASSIGN`, and `TIME_SYNC` have a broadcast destination.
+`DISCOVERY_RESPONSE` is the only version 1 message allowed to use source zero.
+Source `0x1FF` and destination zero are always invalid.
+
+== Lifecycle messages
+
+=== ANNOUNCE
+
+Sent once after a node has successfully claimed its address and whenever a
+`DISCOVERY_REQUEST` asks for announcements. Startup transmission is delayed by
+a UID-derived interval in the range 0 to 1000 ms.
+
+[cols="1,2,4",options="header"]
+|===
+|Byte |Field |Meaning
+|B0 |Sequence |New sequence value.
+|B1 |Protocol major |Supported major version.
+|B2 |Protocol minor |Supported minor version.
+|B3 |Capabilities |Capability bits defined below.
+|B4..B7 |Boot token |Random non-zero `UINT32`, regenerated on every boot.
+|===
+
+Capability bits are: bit 0 configuration, bit 1 diagnostics, bit 2 time
+synchronization consumer, bit 3 bridge, bit 4 local automation, and bits 5..7
+reserved. A node without a high-quality random source MAY derive a boot token
+from its UID, a persistent boot counter, and timer state, but it MUST minimize
+reuse across consecutive boots.
+
+=== HEARTBEAT
+
+[cols="1,2,4",options="header"]
+|===
+|Byte |Field |Meaning
+|B0 |Sequence |New sequence value.
+|B1 |Node status |Bits defined below.
+|B2..B5 |Boot token |Same token as `ANNOUNCE`.
+|B6 |TX queue load |Approximate percentage, 0 to 100; `0xFF` if unavailable.
+|B7 |Reserved |Zero.
+|===
+
+Node status bit 0 is degraded, bit 1 is configuration required, bit 2 is an
+application fault, bit 3 is CAN error-passive on any local interface, and bit 4
+is bus-off recovery in progress. Bits 5..7 are reserved.
+
+A node SHOULD send a heartbeat every 30 seconds with a stable UID-derived
+jitter of up to plus or minus 5 seconds. A receiver MAY regard a node as offline
+after three expected intervals, but offline policy is not a wire-level state.
+
+== Application value messages
+
+=== STATE
+
+[cols="1,2,4",options="header"]
+|===
+|Byte |Field |Meaning
+|B0 |Sequence |New sequence value.
+|B1 |Endpoint |`0x01..0xFE`.
+|B2 |Data type |Value type registry code.
+|B3 |Quality |State quality flags.
+|B4..B7 |Value |Typed four-byte value slot.
+|===
+
+A state publisher SHOULD send `STATE` after a meaningful value change, after an
+accepted command changes externally observable state, and in response to
+`GET_STATE`. The destination MAY be broadcast for subscribed-by-convention
+installation traffic. Periodic full-state refresh is not required.
+
+=== EVENT
+
+[cols="1,2,4",options="header"]
+|===
+|Byte |Field |Meaning
+|B0 |Sequence |Unique for this occurrence.
+|B1 |Endpoint |Originating endpoint.
+|B2 |Data type |Type of the event value.
+|B3 |Flags |Bit 0 `ACK_REQUIRED`; bit 1 `LATCHED`; bit 2 `RETRY`; others zero.
+|B4..B7 |Value |Typed event value.
+|===
+
+`LATCHED` indicates that an explicit application action is required to clear
+the condition; it does not define that action. `ACK_REQUIRED` is valid only for
+unicast events. A broadcast event MUST clear both `ACK_REQUIRED` and `RETRY`.
+Reliable unicast event retries retain the sequence, set `RETRY`, and use the
+same timeout and duplicate-ACK rules as commands. Every new occurrence,
+including one with an equal value, uses a new sequence.
+
+=== COMMAND
+
+[cols="1,2,4",options="header"]
+|===
+|Byte |Field |Meaning
+|B0 |Transaction |Identifier retained by retries.
+|B1 |Endpoint |Target endpoint, `0x01..0xFE`.
+|B2 |Data type |Type expected by the endpoint.
+|B3 |Flags |Bit 0 `ACK_REQUIRED`; bit 1 `RETRY`; others zero.
+|B4..B7 |Value |Requested typed value or action argument.
+|===
+
+Commands are unicast. `RETRY` is clear on the first attempt and set on every
+retry. A receiver MUST execute at most once all copies with the same source,
+boot token, kind, endpoint, and transaction observed during the duplicate
+retention window. It MUST resend the cached `ACK` for a duplicate that requested
+one.
+
+A node supporting commands MUST retain enough recent transaction records to
+cover at least two seconds and at least the most recent 16 commands. Learning a
+new boot token for a source clears that source's duplicate records. A sender
+that does not know the destination's current boot session SHOULD request state
+before issuing a non-idempotent action.
+
+An accepted command does not silently substitute for state publication. If the
+command changes observable state, the target SHOULD publish `STATE` after the
+change is applied.
+
+== Request and response
+
+`REQUEST` and `RESPONSE` use these layouts:
+
+[cols="1,2,2,3",options="header"]
+|===
+|Byte |REQUEST |RESPONSE |Meaning
+|B0 |Transaction |Transaction |Copied unchanged.
+|B1 |Endpoint |Endpoint |Node, function, or requested wildcard.
+|B2 |Operation |Operation |Operation registry code.
+|B3 |Argument |Status |Request argument or response status.
+|B4..B7 |Arguments |Data |Operation-specific four bytes.
+|===
+
+[cols="1,2,4",options="header"]
+|===
+|Operation |Name |Definition
+
+|`0x01`
+|`GET_STATE`
+|Endpoint is `0x01..0xFE` or `0xFF`. Argument and remaining bytes are zero. The
+target publishes one `STATE` per requested endpoint to the requester, with
+`INITIAL` set. No `RESPONSE` is sent. Wildcard replies MUST be paced.
+
+|`0x02`
+|`GET_NODE_INFO`
+|Endpoint is zero. B3 is page. Page 0 response data: device class `UINT16`,
+capabilities byte, endpoint count byte. Page 1: firmware major, minor, patch,
+and hardware revision bytes.
+
+|`0x03`
+|`GET_ENDPOINT_INFO`
+|Endpoint is `0x01..0xFE`. B3 is page. Page 0 response data: data type, unit,
+endpoint capability flags, and zero. Page 1 is a stable implementation-defined
+32-bit profile identifier, or zero when no published profile applies.
+|===
+
+Endpoint capability bits are bit 0 readable state, bit 1 emits events, bit 2
+accepts commands, bit 3 configurable, bit 4 supports local binding, and bits
+5..7 reserved. Unknown operations or pages receive a response with status
+`UNSUPPORTED` and zero data.
+
+Because all version 1 requests are read-only, a requester MAY retry a missing
+response at most twice with the same transaction. The target repeats the result
+without creating application side effects.
+
+== ACK
+
+[cols="1,2,4",options="header"]
+|===
+|Byte |Field |Meaning
+|B0 |Transaction |Transaction of the acknowledged message.
+|B1 |Endpoint |Related endpoint, or zero for node-level operations.
+|B2 |Original kind |Kind code being acknowledged.
+|B3 |Status |Status registry value.
+|B4..B7 |Detail |Operation-specific `UINT32`, zero if unused.
+|===
+
+[cols="1,2,4",options="header"]
+|===
+|Status |Name |Meaning
+|`0x00` |`ACCEPTED` |Validated and accepted; completion may be reported by state.
+|`0x01` |`BUSY` |Temporary rejection; retry after delay in detail, milliseconds.
+|`0x02` |`UNSUPPORTED` |Kind, operation, key, type, or endpoint is unsupported.
+|`0x03` |`INVALID_VALUE` |Value is malformed or outside the accepted range.
+|`0x04` |`DENIED` |Installation or application policy rejected the operation.
+|`0x05` |`FAULT` |Target cannot act because of a local fault.
+|`0x06` |`CONFLICT` |Current state or configuration conflicts with the operation.
+|`0x07` |`INTERNAL_ERROR` |Execution failed for another local reason.
+|`0x08` to `0xFF` |Reserved |Future assignment.
+|===
+
+An ACK confirms application acceptance, not physical output feedback. The
+resulting `STATE` is authoritative. `ACK` is never acknowledged.
+
+When `ACK_REQUIRED` is set, the sender SHOULD wait at least 100 ms for an ACK,
+then retry at most twice using the same transaction and `RETRY` set. A deployment
+MAY increase the timeout for slow or deeply bridged segments. Failure after the
+retry limit is reported locally; it MUST NOT cause an unbounded retry loop.
+
+== PROTOCOL_ERROR
+
+[cols="1,2,4",options="header"]
+|===
+|Byte |Field |Meaning
+|B0 |Sequence |New sequence value.
+|B1 |Related kind |Rejected kind code.
+|B2 |Related transaction |Transaction or sequence, zero if unavailable.
+|B3 |Status |Non-zero status registry value.
+|B4..B7 |Detail |Implementation-independent detail when defined, else zero.
+|===
+
+Errors are unicast to the source. An error MUST NOT be generated for an error,
+ACK, response, malformed broadcast, unknown source zero, or frame not addressed
+to the receiver. Rate limiting is required; diagnostics counters remain the
+primary way to inspect repeated malformed traffic.
+
+== TIME_SYNC
+
+[cols="1,2,4",options="header"]
+|===
+|Byte |Field |Meaning
+|B0 |Sequence |New sequence value.
+|B1 |Quality |0 unsynchronized, 1 manually set, 2 network synchronized, 3 GNSS;
+other values reserved.
+|B2..B5 |Unix time |Unsigned seconds since 1970-01-01 00:00:00 UTC.
+|B6..B7 |Milliseconds |0 to 999 within the second.
+|===
+
+`TIME_SYNC` is broadcast and optional. It conveys UTC only, not time zone or
+daylight-saving rules. Nodes MUST NOT depend on it for safety-critical timing.

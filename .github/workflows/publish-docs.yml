@@ -1,0 +1,106 @@
+name: Publish documentation
+
+on:
+  push:
+    paths:
+      - "docs/**"
+      - ".github/workflows/publish-docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      BUNDLE_GEMFILE: ${{ github.workspace }}/docs/Gemfile
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: docs
+
+      - name: Set up Java for PlantUML
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Configure GitHub Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Install PlantUML layout dependency
+        run: sudo apt-get update && sudo apt-get install --yes graphviz
+
+      - name: Render AsciiDoc and PlantUML
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf _site
+          mkdir -p _site
+          diagram_cache_dir="$RUNNER_TEMP/asciidoctor-diagram-cache"
+          mkdir -p "$diagram_cache_dir"
+
+          while IFS= read -r source; do
+            output_dir="_site/$(dirname "$source")"
+            mkdir -p "$output_dir"
+            bundle exec asciidoctor \
+              --require asciidoctor-diagram \
+              --attribute imagesdir=images \
+              --attribute "imagesoutdir=$output_dir/images" \
+              --attribute "diagram-cachedir=$diagram_cache_dir" \
+              --destination-dir "$output_dir" \
+              "$source"
+          done < <(find . \
+            -path "./.git" -prune -o \
+            -path "./_site" -prune -o \
+            -name "*.adoc" -print | sort)
+
+          printf '%s\n' \
+            '<!doctype html>' \
+            '<html lang="en">' \
+            '<head>' \
+            '  <meta charset="utf-8">' \
+            '  <meta http-equiv="refresh" content="0; url=docs/index.html">' \
+            '  <link rel="canonical" href="docs/index.html">' \
+            '  <title>HACAN documentation</title>' \
+            '</head>' \
+            '<body><p><a href="docs/index.html">Open HACAN documentation</a></p></body>' \
+            '</html>' > _site/index.html
+
+          touch _site/.nojekyll
+          test -f _site/index.html
+          test -f _site/docs/index.html
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

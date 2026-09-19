@@ -1,0 +1,79 @@
+= HACAN protocol specification
+:toc: left
+:sectnums:
+
+Status: *Proposed, version 1.0.0-draft.1*
+
+HACAN (Home Automation over CAN) is an application protocol for distributed home
+automation nodes connected by Classical CAN. This specification is independent
+of ESPHome and is intended to be implementable on other embedded platforms.
+
+The keywords *MUST*, *MUST NOT*, *REQUIRED*, *SHOULD*, *SHOULD NOT*, and *MAY*
+are to be interpreted as described by RFC 2119 and RFC 8174 when, and only when,
+they appear in uppercase.
+
+This draft is a design proposal. Its decisions become project requirements only
+after the corresponding architecture decision records are accepted.
+
+== Design status
+
+The established project constraints are: CAN as transport, independence from
+ESPHome, support for approximately 100 to 200 field modules and several main
+devices, active branching, local operation during central-service outages,
+event-oriented traffic, deterministic embedded behavior, and future-compatible
+extension.
+
+The concrete wire choices in this specification are proposals derived from
+those constraints. In particular, Classical CAN, 29-bit identifiers, the bit
+layout, 9-bit addresses, payload schemas, timing defaults, acknowledgement
+policy, and commissioning procedure are not pre-existing requirements.
+
+The main review decisions still open are acceptance or revision of the eight
+proposed ADRs, validation of 125 kbit/s and CAN timing against the intended
+wiring, definition of the first endpoint profiles, and selection of actuator
+failure policies. Authenticated operation, group addressing, firmware transfer,
+and CAN FD remain explicitly deferred designs.
+
+== Specification map
+
+* xref:overview.adoc[Protocol overview]
+* xref:addressing.adoc[Addressing]
+* xref:frame-format.adoc[CAN identifier and frame format]
+* xref:message-types.adoc[Message types and payloads]
+* xref:data-types.adoc[Data types and value representation]
+* xref:discovery.adoc[Discovery and commissioning]
+* xref:configuration.adoc[Configuration]
+* xref:routing.adoc[Multi-segment routing]
+* xref:diagnostics.adoc[Diagnostics, restart, and overload behavior]
+* xref:versioning.adoc[Versioning and extensibility]
+* xref:security.adoc[Security model]
+* xref:examples.adoc[Examples and test vectors]
+
+The rationale and alternatives are recorded in
+xref:../architecture/decisions/index.adoc[Architecture decision records].
+
+== Scope of version 1
+
+Version 1 defines:
+
+* Classical CAN data frames with a 29-bit extended identifier and an 8-byte
+  payload;
+* global node addresses and local endpoint identifiers;
+* state, event, command, request/response, configuration, discovery, time, and
+  diagnostic messages;
+* optional application acknowledgements with bounded retries;
+* active forwarding between CAN segments arranged as a tree;
+* compatibility and extension rules.
+
+Version 1 does not define firmware transfer, generic payload fragmentation,
+dynamic endpoint schemas, authentication, encryption, or an ESPHome entity
+mapping. These are deliberate exclusions, not implied features.
+
+== Conformance
+
+A conforming implementation MUST implement the identifier validation rules,
+address rules, byte order, unknown-value handling, and restart behavior in this
+specification. Features explicitly marked optional need not be implemented, but
+an implementation MUST advertise optional capabilities accurately.
+
+A bridge is also a node and MUST satisfy both the node and bridge requirements.

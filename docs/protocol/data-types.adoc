@@ -1,0 +1,149 @@
+= Data types
+:toc: left
+:sectnums:
+
+== Byte order
+
+All multi-byte integers and IEEE 754 values in the HACAN payload are encoded
+little-endian: the least significant byte is transmitted first. Identifier
+fields retain the bit positions defined in xref:frame-format.adoc[Frame format]
+and are not byte-serialized by the application.
+
+== Value slot
+
+`STATE`, `EVENT`, and `COMMAND` carry a four-byte value slot in `B4..B7`. The
+data type in `B2` determines how many bytes are meaningful. Unused high bytes
+MUST be zero, including sign-extended bytes that are not part of the declared
+type.
+
+[cols="1,2,1,4",options="header"]
+|===
+|Code |Name |Bytes |Encoding
+
+|`0x00`
+|`NULL`
+|0
+|No value. All four value bytes are zero.
+
+|`0x01`
+|`BOOL`
+|1
+|`0x00` is false and `0x01` is true. Other values are invalid.
+
+|`0x02`
+|`UINT8`
+|1
+|Unsigned integer.
+
+|`0x03`
+|`INT8`
+|1
+|Two's-complement signed integer.
+
+|`0x04`
+|`UINT16`
+|2
+|Unsigned integer, little-endian.
+
+|`0x05`
+|`INT16`
+|2
+|Two's-complement signed integer, little-endian.
+
+|`0x06`
+|`UINT32`
+|4
+|Unsigned integer, little-endian.
+
+|`0x07`
+|`INT32`
+|4
+|Two's-complement signed integer, little-endian.
+
+|`0x08`
+|`FLOAT32`
+|4
+|IEEE 754 binary32, little-endian. Quiet NaN means unavailable. Signaling NaN
+MUST NOT be transmitted. Infinities are valid only if allowed by the endpoint.
+
+|`0x09`
+|`FIXED16_16`
+|4
+|Signed two's-complement integer divided by 65536.
+
+|`0x0A`
+|`ENUM8`
+|1
+|Endpoint-specific enumerated value.
+
+|`0x0B`
+|`BITSET32`
+|4
+|Endpoint-specific bit field.
+
+|`0x0C` to `0xFE`
+|Reserved
+|--
+|Reserved for compatible future data types.
+
+|`0xFF`
+|`INVALID`
+|0
+|No usable value, only where explicitly allowed in an error response.
+|===
+
+Text and arbitrary byte strings are not version 1 value types.
+
+== Units
+
+Units are endpoint metadata and are not repeated in every value frame. The
+`GET_ENDPOINT_INFO` request returns the unit code. A sender MUST use the type and
+unit declared for an endpoint; receivers MUST NOT infer a unit from endpoint
+names or device class.
+
+[cols="1,2,3",options="header"]
+|===
+|Code |Unit |Canonical representation
+
+|`0x00` |None |Dimensionless or endpoint-specific enumeration
+|`0x01` |Percent |`FLOAT32`, range 0.0 to 100.0
+|`0x02` |Degree Celsius |`FLOAT32`
+|`0x03` |Relative humidity percent |`FLOAT32`, range 0.0 to 100.0
+|`0x04` |Volt |`FLOAT32`
+|`0x05` |Ampere |`FLOAT32`
+|`0x06` |Watt |`FLOAT32`
+|`0x07` |Watt-hour |`FLOAT32` or `UINT32` as declared
+|`0x08` |Second |Numeric type as declared
+|`0x09` |Hertz |`FLOAT32`
+|`0x0A` |Lux |`FLOAT32`
+|`0x0B` |Pascal |`FLOAT32`
+|`0x0C` |Degree |`FLOAT32`
+|`0x0D` |Meter |`FLOAT32`
+|`0x0E` |Byte |`UINT32`
+|`0x0F` to `0xFE` |Reserved |Future registry assignment
+|`0xFF` |Implementation-specific |Not interoperable without an external profile
+|===
+
+An implementation-specific unit MAY be used during development but SHOULD NOT
+be used by a published interoperable endpoint profile.
+
+== State quality flags
+
+For `STATE`, `B3` contains:
+
+[cols="1,2,4",options="header"]
+|===
+|Bit |Name |Meaning
+
+|0 |`VALID` |The value may be consumed. Exactly one of `VALID` and `FAULT` SHOULD
+normally be set.
+|1 |`STALE` |The last value is retained but its freshness requirement was missed.
+|2 |`FAULT` |The endpoint cannot currently produce or apply a valid value.
+|3 |`OVERRANGE` |The physical value is outside the declared measurement range.
+|4 |`INITIAL` |First state publication in the current boot session or a requested
+snapshot.
+|5..7 |Reserved |Transmit as zero.
+|===
+
+When `VALID` is clear, consumers MUST treat the value slot as informational only.
+

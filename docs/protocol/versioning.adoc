@@ -1,0 +1,73 @@
+= Versioning and extensibility
+:toc: left
+:sectnums:
+
+== Protocol version
+
+HACAN uses semantic protocol versions `MAJOR.MINOR.PATCH` in documentation.
+`ANNOUNCE` carries major and minor because wire compatibility is determined by
+those components. Firmware versions reported by `GET_NODE_INFO` are independent
+of the protocol version.
+
+* MAJOR changes when existing valid frames can acquire incompatible meaning or
+  mandatory behavior changes incompatibly.
+* MINOR changes add optional kinds, operations, types, flags, or stricter
+  definitions that remain safely ignorable by an older receiver.
+* PATCH changes clarify text without changing valid wire behavior.
+
+This document specifies proposed protocol `1.0.0-draft.1`. Draft revisions are
+not compatibility promises. The first accepted publication removes the draft
+suffix.
+
+== Compatibility rules
+
+Nodes with the same major version interoperate using the subset understood by
+both. A sender MUST discover or otherwise know support before using an optional
+minor-version feature in a unicast operation.
+
+A node observing an unsupported major version MAY discover and diagnose it but
+MUST NOT send application commands or configuration to it. Bridges forward
+unknown versions because the base identifier layout is stable for major version
+1; a future incompatible major may require a separately assigned discriminator.
+
+Unknown message kinds are ignored and counted. Unknown request operations,
+configuration keys, diagnostic items, data types in directed operations, and
+set flag bits are rejected with `UNSUPPORTED` or `INVALID_VALUE` as applicable.
+Unknown fields in passive publications cause that publication to be ignored;
+they do not take the node offline.
+
+== Registries
+
+The project maintains registries for:
+
+* message kinds;
+* value data types and units;
+* request operations and status values;
+* standard diagnostic items;
+* published device classes and endpoint profile identifiers;
+* standard configuration keys within each profile.
+
+Assignments in reserved standard ranges require a specification update and
+test vectors. Values marked vendor-specific may be used without central
+assignment but are not interoperable outside that implementation.
+
+Once a value is present in an accepted release, it MUST NOT be reassigned to a
+different meaning. Deprecated values remain reserved.
+
+== Feature discovery
+
+Node-wide capabilities are available in `ANNOUNCE`, `DISCOVERY_RESPONSE`, and
+`GET_NODE_INFO`. Endpoint capabilities, value type, unit, and optional profile
+identifier are available through `GET_ENDPOINT_INFO`.
+
+Capabilities indicate protocol mechanics, not authorization. For example, a
+node advertising configuration support may still deny a write outside its
+commissioning mode.
+
+== Future transport features
+
+CAN FD, generic segmentation, authenticated messages, group addressing, and
+bulk transfer are not encoded by consuming currently reserved bits ad hoc. Each
+requires an ADR covering coexistence, resource bounds, failure recovery, and
+compatibility with version 1 nodes.
+
