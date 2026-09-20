@@ -111,7 +111,9 @@ The first two profiles are deliberately narrow:
 * `binary_sensor: platform: hacan` mirrors an existing local binary sensor and
   publishes its changes as `STATE<bool>`.
 * `switch: platform: hacan` owns a local `output`, applies received
-  `COMMAND<bool>`, and publishes the resulting `STATE<bool>`.
+  `COMMAND<bool>`, and publishes the resulting `STATE<bool>`. Its optional
+  state-source subscription is represented by a portable `IStateListener`;
+  one source entity may therefore fan out to many local switch outputs.
 
 Neither profile sends `EVENT`; momentary-button semantics are a separate
 endpoint profile.

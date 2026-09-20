@@ -52,6 +52,23 @@ class CapturingEndpoint final : public IEndpointHandler {
   TypedValue last_value{DataType::kNull, {0, 0, 0, 0}};
 };
 
+class CapturingStateListener final : public IStateListener {
+ public:
+  explicit CapturingStateListener(EntityId entity) : entity_(entity) {}
+
+  EntityId observed_entity() const override { return entity_; }
+  void state(TypedValue value, StateQuality quality) override {
+    ++updates;
+    last_value = value;
+    last_quality = quality;
+  }
+
+  EntityId entity_;
+  std::uint8_t updates{0};
+  TypedValue last_value{DataType::kNull, {0, 0, 0, 0}};
+  StateQuality last_quality{StateQuality::kValid};
+};
+
 TEST_CASE("primary manager assigns an address to a discovered unassigned node") {
   MemoryStorage storage;
   storage.value = NodeAddress{0x001};
@@ -219,6 +236,35 @@ TEST_CASE("runtime publishes an owned boolean state") {
   CHECK(bytes[1] == 3);
   CHECK(bytes[2] == static_cast<std::uint8_t>(DataType::kBool));
   CHECK(bytes[4] == 1);
+}
+
+TEST_CASE("runtime delivers an observed state to every listener for its entity") {
+  MemoryStorage storage;
+  storage.value = NodeAddress{1};
+  CapturingTransmitter transmitter;
+  NodeRuntime runtime{{1, 2, 3, 4, 5, 6}, CommissioningRole::kNone, storage, transmitter};
+  CapturingStateListener first{EntityId{0x01010001}};
+  CapturingStateListener second{EntityId{0x01010001}};
+  REQUIRE(runtime.register_state_listener(first));
+  REQUIRE(runtime.register_state_listener(second));
+
+  const auto claim_id = CanIdentifier::create(Priority::kManagement, MessageKind::kEntityClaim,
+                                              NodeAddress{0x1FF}, NodeAddress{2}, 0);
+  REQUIRE(claim_id);
+  runtime.receive({claim_id->to_raw(), true, 8, {1, 3, 1, 0, 1, 1, 0, 0}}, 100);
+
+  const auto state_id = CanIdentifier::create(Priority::kStateQuery, MessageKind::kState,
+                                              NodeAddress{0x1FF}, NodeAddress{2}, 0);
+  REQUIRE(state_id);
+  runtime.receive({state_id->to_raw(), true, 8,
+                   {2, 3, static_cast<std::uint8_t>(DataType::kBool),
+                    static_cast<std::uint8_t>(StateQuality::kValid), 1, 0, 0, 0}},
+                  101);
+
+  CHECK(first.updates == 1);
+  CHECK(second.updates == 1);
+  CHECK(first.last_value.type() == DataType::kBool);
+  CHECK(first.last_value.bytes()[0] == 1);
 }
 
 TEST_CASE("runtime dispatches a boolean command to a registered endpoint") {

@@ -42,6 +42,13 @@ class IEndpointHandler {
   virtual Status command(TypedValue value) = 0;
 };
 
+class IStateListener {
+ public:
+  virtual ~IStateListener() = default;
+  [[nodiscard]] virtual EntityId observed_entity() const = 0;
+  virtual void state(TypedValue value, StateQuality quality) = 0;
+};
+
 struct EntityLocation {
   EntityId entity{0};
   NodeAddress node{0};
@@ -60,6 +67,7 @@ class NodeRuntime {
   bool register_owned_entity(EntityId entity, EndpointId endpoint);
   bool register_observed_entity(EntityId entity);
   bool register_endpoint(IEndpointHandler& endpoint);
+  bool register_state_listener(IStateListener& listener);
   bool publish_state(EndpointId endpoint, TypedValue value,
                      StateQuality quality = StateQuality::kValid);
   bool enqueue(const ProtocolFrame& frame);
@@ -86,6 +94,8 @@ class NodeRuntime {
   void acknowledge(const ProtocolFrame& frame, Status status);
   [[nodiscard]] IEndpointHandler* endpoint_handler(EndpointId endpoint) const;
   [[nodiscard]] bool owns_endpoint(EndpointId endpoint) const;
+  [[nodiscard]] std::optional<EntityId> entity_for(NodeAddress source,
+                                                    EndpointId endpoint) const;
   bool is_duplicate(const ProtocolFrame& frame, std::uint32_t now_ms,
                     Status *previous_status = nullptr);
   void set_duplicate_status(const ProtocolFrame& frame, Status status);
@@ -104,6 +114,7 @@ class NodeRuntime {
   std::array<std::optional<EntityLocation>, 16> owned_entities_{};
   std::array<std::optional<EntityId>, 16> observed_entities_{};
   std::array<IEndpointHandler*, 16> endpoint_handlers_{};
+  std::array<IStateListener*, 16> state_listeners_{};
   std::array<RawCanFrame, 8> control_queue_{};
   std::array<RawCanFrame, 8> event_queue_{};
   std::array<RawCanFrame, 8> state_queue_{};

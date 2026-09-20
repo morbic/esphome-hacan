@@ -92,7 +92,10 @@ endpoint from Home Assistant.
 local change from Home Assistant or an addressed `COMMAND<bool>` changes the
 output and publishes `STATE<bool>`. An acknowledged command returns its actual
 validation status; receiving the same command retry does not apply the output
-a second time.
+a second time. Optional `state_source_entity_id` subscribes the switch to the
+published `STATE<bool>` of another entity. The directory resolves that entity
+at runtime; when its state arrives, the switch mirrors the value to its local
+output and publishes its own resulting state.
 
 [source,yaml]
 ----
@@ -107,11 +110,14 @@ switch:
     entity_id: 0x01020001
     endpoint: 0x02
     output: out01
+    state_source_entity_id: 0x01010001
     name: Living room main light
 ----
 
 The endpoint declarations above register ownership automatically. Do not repeat
-these EntityIds in `hacan.owned_entities`.
+these EntityIds in `hacan.owned_entities`. Multiple HACAN switches, including
+switches on different nodes, may use the same `state_source_entity_id`; every
+one mirrors the received state independently.
 
 == Commissioning roles
 

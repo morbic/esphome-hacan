@@ -52,4 +52,5 @@ switch:
     entity_id: 0x01020001
     endpoint: 0x02
     output: out01
+    state_source_entity_id: 0x01010001
     name: Living room main light

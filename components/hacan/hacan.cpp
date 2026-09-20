@@ -50,6 +50,17 @@ void HacanComponent::add_owned_endpoint(
            static_cast<unsigned>(kMaxConfiguredEntities));
 }
 
+void HacanComponent::add_state_listener(::hacan::protocol::IStateListener *listener) {
+  for (auto &configured : state_listeners_) {
+    if (configured == nullptr) {
+      configured = listener;
+      return;
+    }
+  }
+  ESP_LOGE(TAG, "Too many HACAN state listeners; maximum is %u",
+           static_cast<unsigned>(kMaxConfiguredEntities));
+}
+
 bool HacanComponent::publish_bool_state(uint8_t endpoint, bool value) {
   if (!runtime_) return false;
   return runtime_->publish_state(::hacan::protocol::EndpointId{endpoint},
@@ -74,6 +85,9 @@ void HacanComponent::setup() {
     if (!endpoint) continue;
     runtime_->register_owned_entity(endpoint->entity, endpoint->endpoint);
     if (endpoint->handler) runtime_->register_endpoint(*endpoint->handler);
+  }
+  for (const auto &listener : state_listeners_) {
+    if (listener != nullptr) runtime_->register_state_listener(*listener);
   }
   canbus_->add_callback([this](uint32_t can_id, bool extended, bool remote,
                                const std::vector<uint8_t> &data) {

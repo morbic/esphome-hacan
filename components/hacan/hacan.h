@@ -20,6 +20,7 @@ class HacanComponent : public Component, public ::hacan::protocol::IFrameTransmi
   void add_observed_entity(uint32_t entity);
   void add_owned_endpoint(uint32_t entity, uint8_t endpoint,
                           ::hacan::protocol::IEndpointHandler *handler);
+  void add_state_listener(::hacan::protocol::IStateListener *listener);
   bool publish_bool_state(uint8_t endpoint, bool value);
   void setup() override;
   void loop() override;
@@ -53,6 +54,7 @@ class HacanComponent : public Component, public ::hacan::protocol::IFrameTransmi
     ::hacan::protocol::IEndpointHandler *handler;
   };
   std::array<std::optional<OwnedEndpoint>, kMaxConfiguredEntities> owned_endpoints_{};
+  std::array<::hacan::protocol::IStateListener *, kMaxConfiguredEntities> state_listeners_{};
   std::optional<::hacan::protocol::NodeRuntime> runtime_{};
   ESPPreferenceObject address_preference_{};
   std::array<uint8_t, 6> uid_{};

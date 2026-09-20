@@ -207,6 +207,20 @@ void NodeRuntime::handle(const ProtocolFrame& frame, std::uint32_t now_ms) {
     }
     return;
   }
+  if (frame.identifier().kind() == MessageKind::kState) {
+    const auto& bytes = std::get<StateFrame>(frame.payload()).bytes();
+    const auto entity = entity_for(source, EndpointId{bytes[1]});
+    if (!entity) return;
+    const TypedValue value{static_cast<DataType>(bytes[2]),
+                           {bytes[4], bytes[5], bytes[6], bytes[7]}};
+    const auto quality = static_cast<StateQuality>(bytes[3]);
+    for (auto* listener : state_listeners_) {
+      if (listener && listener->observed_entity().value() == entity->value()) {
+        listener->state(value, quality);
+      }
+    }
+    return;
+  }
   if (frame.identifier().kind() == MessageKind::kCommand && address_ &&
       frame.identifier().destination().value() == address_->value()) {
     const auto& bytes = std::get<CommandFrame>(frame.payload()).bytes();
@@ -292,6 +306,22 @@ bool NodeRuntime::register_endpoint(IEndpointHandler& endpoint) {
       return true;
     }
     if (registered->endpoint().value() == id) return registered == &endpoint;
+  }
+  return false;
+}
+
+bool NodeRuntime::register_state_listener(IStateListener& listener) {
+  const auto entity = listener.observed_entity();
+  if (entity.value() == 0) return false;
+  for (auto*& registered : state_listeners_) {
+    if (registered == &listener) return true;
+  }
+  for (auto*& registered : state_listeners_) {
+    if (!registered) {
+      if (!register_observed_entity(entity)) return false;
+      registered = &listener;
+      return true;
+    }
   }
   return false;
 }
@@ -534,6 +564,22 @@ bool NodeRuntime::owns_endpoint(EndpointId endpoint) const {
     if (owned && owned->endpoint.value() == endpoint.value()) return true;
   }
   return false;
+}
+
+std::optional<EntityId> NodeRuntime::entity_for(NodeAddress source,
+                                                 EndpointId endpoint) const {
+  if (address_ && source.value() == address_->value()) {
+    for (const auto& owned : owned_entities_) {
+      if (owned && owned->endpoint.value() == endpoint.value()) return owned->entity;
+    }
+  }
+  for (const auto& entity : entities_) {
+    if (entity && entity->node.value() == source.value() &&
+        entity->endpoint.value() == endpoint.value()) {
+      return entity->entity;
+    }
+  }
+  return std::nullopt;
 }
 
 std::optional<EntityLocation> NodeRuntime::resolve(EntityId entity) const {

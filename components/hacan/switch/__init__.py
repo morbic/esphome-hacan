@@ -10,6 +10,7 @@ CONF_HACAN_ID = "hacan_id"
 CONF_ENTITY_ID = "entity_id"
 CONF_ENDPOINT = "endpoint"
 CONF_OUTPUT = "output"
+CONF_STATE_SOURCE_ENTITY_ID = "state_source_entity_id"
 
 HacanSwitch = hacan_ns.class_("HacanSwitch", switch.Switch, cg.Component)
 
@@ -21,6 +22,9 @@ CONFIG_SCHEMA = (
             cv.Required(CONF_ENTITY_ID): cv.hex_uint32_t,
             cv.Required(CONF_ENDPOINT): cv.int_range(min=1, max=0xFE),
             cv.Required(CONF_OUTPUT): cv.use_id(output.BinaryOutput),
+            cv.Optional(CONF_STATE_SOURCE_ENTITY_ID): cv.All(
+                cv.hex_uint32_t, cv.int_range(min=1)
+            ),
         }
     )
     .extend(cv.COMPONENT_SCHEMA)
@@ -36,3 +40,6 @@ async def to_code(config):
     cg.add(var.set_output(output_))
     cg.add(var.set_endpoint(config[CONF_ENDPOINT]))
     cg.add(hacan.add_owned_endpoint(config[CONF_ENTITY_ID], config[CONF_ENDPOINT], var))
+    if CONF_STATE_SOURCE_ENTITY_ID in config:
+        cg.add(var.set_state_source_entity(config[CONF_STATE_SOURCE_ENTITY_ID]))
+        cg.add(hacan.add_state_listener(var))
