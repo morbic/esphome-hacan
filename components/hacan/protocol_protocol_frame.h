@@ -3,8 +3,8 @@
 #include <array>
 #include <variant>
 
-#include <hacan/protocol/can_identifier.h>
-#include <hacan/protocol/wire_payload.h>
+#include "protocol_can_identifier.h"
+#include "protocol_wire_payload.h"
 
 namespace hacan::protocol {
 

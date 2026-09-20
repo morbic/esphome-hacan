@@ -1,4 +1,4 @@
-#include <hacan/protocol/payloads/command.h>
+#include "protocol_payload_command.h"
 
 namespace hacan::protocol {
 namespace {

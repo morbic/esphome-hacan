@@ -1,6 +1,6 @@
 #include <doctest/doctest.h>
 
-#include <hacan/protocol/can_identifier.h>
+#include "protocol_can_identifier.h"
 
 namespace hacan::protocol {
 namespace {

@@ -4,8 +4,8 @@
 #include <cstdint>
 #include <optional>
 
-#include <hacan/protocol/can_identifier.h>
-#include <hacan/protocol/typed_value.h>
+#include "protocol_can_identifier.h"
+#include "protocol_typed_value.h"
 
 namespace hacan::protocol {
 

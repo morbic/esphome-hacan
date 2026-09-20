@@ -1,6 +1,6 @@
 #include <doctest/doctest.h>
 
-#include <hacan/protocol/payloads/lifecycle.h>
+#include "protocol_payload_lifecycle.h"
 
 namespace hacan::protocol {
 namespace {

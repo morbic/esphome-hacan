@@ -1,6 +1,6 @@
 #include <doctest/doctest.h>
 
-#include <hacan/protocol/frame_codec.h>
+#include "protocol_frame_codec.h"
 
 namespace hacan::protocol {
 namespace {

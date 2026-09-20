@@ -1,6 +1,6 @@
 #include <doctest/doctest.h>
 
-#include <hacan/protocol/version.h>
+#include "protocol_version.h"
 
 TEST_CASE("protocol library exposes version one constants") {
   CHECK(hacan::protocol::kProtocolMajor == 1);

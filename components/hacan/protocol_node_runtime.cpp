@@ -1,4 +1,4 @@
-#include <hacan/protocol/node_runtime.h>
+#include "protocol_node_runtime.h"
 
 namespace hacan::protocol {
 

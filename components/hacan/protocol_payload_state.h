@@ -3,7 +3,7 @@
 #include <array>
 #include <optional>
 
-#include <hacan/protocol/typed_value.h>
+#include "protocol_typed_value.h"
 
 namespace hacan::protocol {
 enum class StateQuality : std::uint8_t { kValid = 1U << 0U, kStale = 1U << 1U, kFault = 1U << 2U, kOverrange = 1U << 3U, kInitial = 1U << 4U };

@@ -2,8 +2,8 @@
 
 #include <variant>
 
-#include <hacan/protocol/protocol_frame.h>
-#include <hacan/protocol/raw_can_frame.h>
+#include "protocol_protocol_frame.h"
+#include "protocol_raw_can_frame.h"
 
 namespace hacan::protocol {
 

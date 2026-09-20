@@ -1,4 +1,4 @@
-#include <hacan/protocol/payloads/state.h>
+#include "protocol_payload_state.h"
 
 namespace hacan::protocol {
 namespace {

@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <optional>
 
-#include <hacan/protocol/frame_codec.h>
+#include "protocol_frame_codec.h"
 
 namespace hacan::protocol {
 

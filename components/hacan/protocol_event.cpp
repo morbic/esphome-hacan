@@ -1,4 +1,4 @@
-#include <hacan/protocol/payloads/event.h>
+#include "protocol_payload_event.h"
 
 namespace hacan::protocol {
 namespace {

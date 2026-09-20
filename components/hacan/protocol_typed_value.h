@@ -3,7 +3,7 @@
 #include <array>
 #include <cstdint>
 
-#include <hacan/protocol/types.h>
+#include "protocol_types.h"
 
 namespace hacan::protocol {
 

@@ -1,6 +1,6 @@
 #include <doctest/doctest.h>
 
-#include <hacan/protocol/payloads/entities.h>
+#include "protocol_payload_entities.h"
 
 namespace hacan::protocol {
 namespace {

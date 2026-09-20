@@ -33,3 +33,27 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build/protocol --output-on-failure
+
+  esphome:
+    name: Validate ESPHome adapter
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install ESPHome
+        run: pip install esphome
+
+      - name: Validate example configuration
+        run: |
+          esphome config examples/minimal.yaml
+          esphome config examples/entities.yaml
+
+      - name: Compile ESP-IDF example
+        run: esphome compile examples/minimal.yaml

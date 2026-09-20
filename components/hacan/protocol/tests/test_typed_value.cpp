@@ -1,6 +1,6 @@
 #include <doctest/doctest.h>
 
-#include <hacan/protocol/typed_value.h>
+#include "protocol_typed_value.h"
 
 namespace hacan::protocol {
 namespace {
