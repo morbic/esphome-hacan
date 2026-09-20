@@ -13,26 +13,24 @@ The implementation separates the portable protocol library from the ESPHome
 adapter. Neither the codec nor node behavior may depend on ESPHome, Arduino,
 ESP-IDF, heap allocation, or blocking operations.
 
-== Planned source layout
+== Source layout
 
 ----
 components/hacan/
   __init__.py
-  hacan_component.h
-  hacan_component.cpp
+  hacan.h
+  hacan.cpp
+  protocol_*.h
+  protocol_*.cpp
   protocol/
-    include/hacan/protocol/
-    src/
     tests/
     CMakeLists.txt
-tests/esphome/hacan/
 ----
 
-The protocol library is physically below the component so ESPHome copies its
-C++ sources into its generated PlatformIO project. It remains logically
-independent: it uses only standard C++ and has its own CMake build and host
-tests. It can later be extracted into a separate repository without changing
-its public API.
+The protocol sources are physically in the component root so ESPHome copies
+them into its generated build project. The CMake test target remains under
+`protocol/`. The library is logically independent: it uses only standard C++,
+has host tests, and can later be extracted without changing its public API.
 
 == Runtime flow
 
@@ -46,6 +44,12 @@ ESPHome CAN callback -> HacanComponent -> NodeRuntime -> FrameCodec
 the public ESPHome API, obtains monotonic time, and stores the commissioned
 address using ESPHome persistent preferences. It does not encode payload bytes
 or own protocol state machines.
+
+Configured entities and `NodeRuntime` are stored in fixed-capacity in-place
+storage. The ESPHome `canbus` API itself requires `std::vector<uint8_t>` for
+its callback and transmit signatures; that API-bound conversion is the only
+dynamic container at the adapter boundary. The portable protocol path has no
+heap allocation.
 
 `NodeRuntime` owns commissioning, address claim and conflict behavior,
 heartbeat scheduling, the volatile entity directory, duplicate tracking,
@@ -113,3 +117,11 @@ state. Commands and events are never coalesced.
 
 The transmitter drains higher CAN priorities before lower ones. Queue drops are
 reported through `tx_queue_drops`.
+
+== Base diagnostics
+
+`HacanComponent` exposes structured C++ accessors for accepted received frames,
+malformed received frames, and successfully transmitted frames. `dump_config()`
+also logs these counters, the persisted NodeAddress, and configured entity
+counts. ESPHome diagnostic entities and protocol `DIAGNOSTIC_REQUEST` handling
+remain deferred.

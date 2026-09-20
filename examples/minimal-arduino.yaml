@@ -1,0 +1,26 @@
+esphome:
+  name: hacan-minimal-arduino
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+
+logger:
+
+canbus:
+  - platform: esp32_can
+    id: hacan_bus
+    can_id: 0x000
+    bit_rate: 125kbps
+    tx_pin: GPIO5
+    rx_pin: GPIO4
+
+hacan:
+  canbus_id: hacan_bus
+  commissioning_role: none

@@ -22,13 +22,18 @@ ENTITY = cv.Schema({
     cv.Required(CONF_ENTITY_ID): cv.hex_uint32_t,
     cv.Optional(CONF_ENDPOINT): cv.hex_uint8_t,
 })
+ENTITY_LIST = cv.All(cv.ensure_list(ENTITY), cv.Length(max=16))
+OWNED_ENTITY_LIST = cv.All(
+    cv.ensure_list(ENTITY.extend({cv.Required(CONF_ENDPOINT): cv.hex_uint8_t})),
+    cv.Length(max=16),
+)
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(HacanComponent),
     cv.Required(CONF_CANBUS_ID): cv.use_id(canbus.CanbusComponent),
     cv.Optional(CONF_COMMISSIONING_ROLE, default="none"): cv.enum(ROLE, lower=True),
-    cv.Optional(CONF_OWNED_ENTITIES, default=[]): cv.ensure_list(ENTITY.extend({cv.Required(CONF_ENDPOINT): cv.hex_uint8_t})),
-    cv.Optional(CONF_OBSERVED_ENTITIES, default=[]): cv.ensure_list(ENTITY),
+    cv.Optional(CONF_OWNED_ENTITIES, default=[]): OWNED_ENTITY_LIST,
+    cv.Optional(CONF_OBSERVED_ENTITIES, default=[]): ENTITY_LIST,
 }).extend(cv.COMPONENT_SCHEMA)
 
 

@@ -10,14 +10,16 @@ management traffic such as heartbeats to evict commands, events, or states.
 
 == Decision
 
-Generate fixed queue capacities from the `tx_queues` YAML mapping at firmware
-build time. Use `std::array` storage for separate control, event, state/query,
-management, and diagnostic queues. Drain higher CAN priorities first. A queue
+Use fixed `std::array` storage for separate control, event, state/query,
+management, and diagnostic queues. The initial implementation uses a capacity
+of eight frames for each queue. Drain higher CAN priorities first. A queue
 cannot evict entries in another class. Only unsent state for the same endpoint
 may be coalesced.
 
 == Consequences
 
-Memory use is deterministic and can be tuned per firmware build without heap
-allocation. Commands and events retain their individual occurrences. This is
-an ESPHome implementation policy, not a change to the HACAN wire protocol.
+Memory use is deterministic without heap allocation. Commands and events
+retain their individual occurrences. Per-firmware YAML queue capacities remain
+an intentionally deferred enhancement; adding them must preserve the separation
+between traffic classes. This is an ESPHome implementation policy, not a
+change to the HACAN wire protocol.

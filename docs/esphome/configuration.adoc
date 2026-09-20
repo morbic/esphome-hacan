@@ -1,10 +1,9 @@
-= Planned YAML configuration
+= ESPHome YAML configuration
 :toc: left
 :sectnums:
 
-This page specifies the planned configuration interface for the first base
-component. It is an implementation design, not an available configuration
-until the component is implemented.
+This page specifies the available configuration interface for the HACAN base
+component.
 
 == Central entity registry
 
@@ -36,12 +35,6 @@ packages:
 hacan:
   canbus_id: hacan_bus
   commissioning_role: primary  # primary | secondary | none
-  tx_queues:
-    control: 4
-    event: 4
-    state_query: 8
-    management: 4
-    diagnostics: 2
   owned_entities:
     - endpoint: 0x01
       entity_id: ${hacan_living_room_main_light_switch}
@@ -55,9 +48,15 @@ assigned by commissioning and persisted locally by the component.
 
 `owned_entities` configures the `ENTITY_CLAIM` assignments made by this node.
 `observed_entities` identifies mappings that the node restores through
-`ENTITY_RESOLVE`. Future HACAN endpoint platforms register the same declarations
-automatically; these lists remain a low-level option for endpoints without a
-dedicated platform.
+`ENTITY_RESOLVE`. After commissioning, the runtime emits one resolve request
+per main-loop iteration for each configured observed entity. An owning node
+answers with a fresh `ENTITY_CLAIM`, which restores the volatile mapping.
+
+Each list accepts at most 16 declarations. This bound is checked during YAML
+validation and matches the fixed-capacity storage in the component and runtime.
+Future HACAN endpoint platforms register the same declarations automatically;
+these lists remain a low-level option for endpoints without a dedicated
+platform.
 
 == Commissioning roles
 
@@ -66,6 +65,10 @@ dedicated platform.
 endpoint node. `secondary` is accepted configuration but remains passive in the
 first implementation: it does not assign addresses and logs that automatic
 failover is not implemented.
+
+On first boot, the sole `primary` persists the reserved bootstrap address
+`0x001` and then performs the normal claim procedure. Other nodes receive an
+automatically assigned address from that manager.
 
 Only one active `primary` role is supported in an installation. Address conflict
 handling remains active on every node, as required by the protocol.

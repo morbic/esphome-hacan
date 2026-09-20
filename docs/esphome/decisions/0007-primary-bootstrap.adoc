@@ -1,0 +1,28 @@
+= HACAN-ESP-ADR-0007: Reserve a bootstrap address for the primary commissioning manager
+
+Status: *Accepted*
+
+== Context
+
+Automatic address assignment needs an already commissioned manager to transmit
+`ADDRESS_ASSIGN`. A fresh installation otherwise has no source address from
+which a primary manager can coordinate discovery.
+
+== Decision
+
+The ESPHome component reserves NodeAddress `0x001` for the sole configured
+`commissioning_role: primary`. On its first boot, a primary with no persisted
+address stores `0x001` in ESPHome preferences and performs the normal two-frame
+`ADDRESS_CLAIM` procedure. Every node with `commissioning_role: none` remains
+unassigned until it receives an `ADDRESS_ASSIGN`.
+
+Only one active primary is permitted. A future secondary takeover mechanism
+must use explicit leader-election or lease semantics before it can use the
+bootstrap address.
+
+== Consequences
+
+Cold-start commissioning is deterministic and requires no separate tool or
+manual NVS provisioning. NodeAddress `0x001` cannot be assigned to a regular
+node by the ESPHome primary manager. This is an ESPHome commissioning policy;
+it does not change the CAN frame format.

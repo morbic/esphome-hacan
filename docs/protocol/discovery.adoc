@@ -48,6 +48,10 @@ issue `ADDRESS_ASSIGN` without changing either frame layout.
 `DISCOVERY_RESPONSE` is sent to the requester. A commissioned node uses its
 normal source address. An unassigned node uses source zero.
 
+When the requester is unassigned, its source and therefore the response
+destination are zero. Destination zero is valid only for this unassigned
+`DISCOVERY_RESPONSE` case; it is invalid for every other version 1 frame.
+
 [cols="1,2,4",options="header"]
 |===
 |Byte |Field |Meaning

@@ -42,7 +42,8 @@ source. `ANNOUNCE`, `HEARTBEAT`, `DISCOVERY_REQUEST`, `ADDRESS_CLAIM`,
 `ADDRESS_ASSIGN`, and `TIME_SYNC` have a broadcast destination.
 `ENTITY_CLAIM` and `ENTITY_RESOLVE` also have a broadcast destination.
 `DISCOVERY_REQUEST` and `DISCOVERY_RESPONSE` are the only version 1 messages allowed to use source zero.
-Source `0x1FF` and destination zero are always invalid.
+Source `0x1FF` is always invalid. Destination zero is valid only for a
+`DISCOVERY_RESPONSE` addressed to an unassigned requester.
 
 == Lifecycle messages
 

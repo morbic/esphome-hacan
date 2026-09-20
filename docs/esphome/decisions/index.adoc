@@ -28,6 +28,10 @@
 |HACAN-ESP-ADR-0006
 |xref:0006-initial-scope-and-testing.adoc[Stage ESPHome endpoint platforms after the core implementation]
 |Accepted
+
+|HACAN-ESP-ADR-0007
+|xref:0007-primary-bootstrap.adoc[Reserve a bootstrap address for the primary commissioning manager]
+|Accepted
 |===
 
 These records describe implementation choices. Protocol-wide decisions are in

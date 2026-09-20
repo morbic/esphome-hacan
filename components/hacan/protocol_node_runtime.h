@@ -50,6 +50,7 @@ class NodeRuntime {
   void receive(const RawCanFrame& raw, std::uint32_t now_ms);
   void tick(std::uint32_t now_ms);
   bool register_owned_entity(EntityId entity, EndpointId endpoint);
+  bool register_observed_entity(EntityId entity);
   bool enqueue(const ProtocolFrame& frame);
   bool drain_one();
   [[nodiscard]] std::optional<NodeAddress> address() const { return address_; }
@@ -65,7 +66,12 @@ class NodeRuntime {
   void withdraw_address();
   void send_claim();
   void send_discovery_request(std::uint32_t now_ms);
+  void schedule_discovery_response(const std::array<std::uint8_t, 8>& request,
+                                   NodeAddress requester, std::uint32_t now_ms);
+  void send_discovery_response(std::uint8_t transaction, NodeAddress requester);
   void send_entity_claim(EntityId entity, EndpointId endpoint);
+  void send_entity_resolve(EntityId entity);
+  void send_address_conflict(const NodeUid& winner);
   void acknowledge(const ProtocolFrame& frame);
   bool is_duplicate(const ProtocolFrame& frame, std::uint32_t now_ms);
   [[nodiscard]] std::optional<NodeAddress> next_free_address() const;
@@ -81,6 +87,7 @@ class NodeRuntime {
   std::array<bool, 0x200> seen_{};
   std::array<std::optional<EntityLocation>, 32> entities_{};
   std::array<std::optional<EntityLocation>, 16> owned_entities_{};
+  std::array<std::optional<EntityId>, 16> observed_entities_{};
   std::array<RawCanFrame, 8> control_queue_{};
   std::array<RawCanFrame, 8> event_queue_{};
   std::array<RawCanFrame, 8> state_queue_{};
@@ -99,11 +106,19 @@ class NodeRuntime {
     std::uint32_t seen_ms{0};
   };
   std::array<std::optional<Duplicate>, 16> duplicates_{};
+  struct PendingDiscoveryResponse {
+    std::uint8_t transaction{0};
+    NodeAddress requester{0};
+    std::uint32_t due_ms{0};
+  };
+  std::optional<PendingDiscoveryResponse> pending_discovery_response_{};
   std::uint32_t next_heartbeat_ms_{0};
   std::uint32_t next_claim_ms_{0};
   std::uint32_t next_discovery_ms_{0};
   std::uint8_t discovery_attempt_{0};
   std::uint8_t claims_sent_{0};
+  std::uint8_t owned_claim_index_{0};
+  std::uint8_t observed_resolve_index_{0};
   std::uint8_t sequence_{0};
 };
 

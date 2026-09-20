@@ -1,0 +1,30 @@
+esphome:
+  name: hacan-commissioning-peer
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+
+logger:
+  level: DEBUG
+
+canbus:
+  - platform: esp32_can
+    id: hacan_bus
+    can_id: 0x000
+    bit_rate: 125kbps
+    tx_pin: GPIO5
+    rx_pin: GPIO4
+
+hacan:
+  canbus_id: hacan_bus
+  commissioning_role: none
+  owned_entities:
+    - endpoint: 0x01
+      entity_id: 0x01010001

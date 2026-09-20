@@ -1,8 +1,7 @@
 #pragma once
 
 #include <array>
-#include <memory>
-#include <vector>
+#include <optional>
 
 #include "esphome/components/canbus/canbus.h"
 #include "esphome/core/component.h"
@@ -12,7 +11,8 @@
 namespace esphome::hacan_esphome {
 
 class HacanComponent : public Component, public ::hacan::protocol::IFrameTransmitter,
-                       public ::hacan::protocol::IAddressStorage {
+                       public ::hacan::protocol::IAddressStorage,
+                       public ::hacan::protocol::INodeEvents {
  public:
   void set_canbus(canbus::Canbus *canbus) { canbus_ = canbus; }
   void set_commissioning_role(uint8_t role);
@@ -25,16 +25,27 @@ class HacanComponent : public Component, public ::hacan::protocol::IFrameTransmi
   bool transmit(const ::hacan::protocol::RawCanFrame &frame) override;
   std::optional<::hacan::protocol::NodeAddress> load() override;
   bool save(::hacan::protocol::NodeAddress address) override;
+  void entity_available(::hacan::protocol::EntityId entity,
+                        ::hacan::protocol::NodeAddress node,
+                        ::hacan::protocol::EndpointId endpoint) override;
+  void entity_unavailable(::hacan::protocol::EntityId entity) override;
+  void address_conflict(::hacan::protocol::NodeAddress address) override;
+  [[nodiscard]] uint32_t received_frames() const { return rx_frames_; }
+  [[nodiscard]] uint32_t malformed_frames() const { return malformed_frames_; }
+  [[nodiscard]] uint32_t transmitted_frames() const { return tx_frames_; }
 
  protected:
+  static constexpr uint8_t kMaxConfiguredEntities = 16;
+
   canbus::Canbus *canbus_{nullptr};
   ::hacan::protocol::CommissioningRole role_{::hacan::protocol::CommissioningRole::kNone};
-  std::vector<::hacan::protocol::EntityLocation> owned_{};
-  std::vector<::hacan::protocol::EntityId> observed_{};
-  std::unique_ptr<::hacan::protocol::NodeRuntime> runtime_{};
+  std::array<std::optional<::hacan::protocol::EntityLocation>, kMaxConfiguredEntities> owned_{};
+  std::array<std::optional<::hacan::protocol::EntityId>, kMaxConfiguredEntities> observed_{};
+  std::optional<::hacan::protocol::NodeRuntime> runtime_{};
   ESPPreferenceObject address_preference_{};
   std::array<uint8_t, 6> uid_{};
   uint32_t rx_frames_{0};
+  uint32_t malformed_frames_{0};
   uint32_t tx_frames_{0};
 };
 

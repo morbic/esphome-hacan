@@ -3,12 +3,14 @@ name: C++ library CI
 on:
   push:
     paths:
-      - "components/hacan/protocol/**"
+      - "components/hacan/**"
+      - "examples/**"
       - ".github/workflows/ci.yml"
       - "CMakeLists.txt"
   pull_request:
     paths:
-      - "components/hacan/protocol/**"
+      - "components/hacan/**"
+      - "examples/**"
       - ".github/workflows/ci.yml"
       - "CMakeLists.txt"
   workflow_dispatch:
@@ -35,8 +37,16 @@ jobs:
         run: ctest --test-dir build/protocol --output-on-failure
 
   esphome:
-    name: Validate ESPHome adapter
+    name: ESPHome (${{ matrix.framework }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - framework: ESP-IDF
+            config: examples/minimal.yaml
+          - framework: Arduino
+            config: examples/minimal-arduino.yaml
 
     steps:
       - name: Check out repository
@@ -52,8 +62,10 @@ jobs:
 
       - name: Validate example configuration
         run: |
-          esphome config examples/minimal.yaml
+          esphome config ${{ matrix.config }}
           esphome config examples/entities.yaml
+          esphome config examples/commissioning-primary.yaml
+          esphome config examples/commissioning-peer.yaml
 
-      - name: Compile ESP-IDF example
-        run: esphome compile examples/minimal.yaml
+      - name: Compile example
+        run: esphome compile ${{ matrix.config }}

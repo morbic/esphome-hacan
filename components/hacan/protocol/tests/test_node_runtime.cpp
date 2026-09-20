@@ -14,8 +14,13 @@ class MemoryStorage final : public IAddressStorage {
 
 class CapturingTransmitter final : public IFrameTransmitter {
  public:
-  bool transmit(const RawCanFrame& frame) override { last = frame; ++count; return true; }
+  bool transmit(const RawCanFrame& frame) override {
+    last = frame;
+    frames[count++] = frame;
+    return true;
+  }
   RawCanFrame last{};
+  std::array<RawCanFrame, 32> frames{};
   std::uint8_t count{0};
 };
 
@@ -37,7 +42,7 @@ TEST_CASE("primary manager assigns an address to a discovered unassigned node") 
                       storage, transmitter};
 
   const auto identifier = CanIdentifier::create(Priority::kManagement,
-      MessageKind::kDiscoveryResponse, NodeAddress{0x001}, NodeAddress{0}, 0);
+      MessageKind::kDiscoveryResponse, NodeAddress{0}, NodeAddress{0}, 0);
   REQUIRE(identifier);
   const RawCanFrame response{identifier->to_raw(), true, 8,
       {1, 8, 7, 6, 5, 4, 3, 0}};
@@ -47,6 +52,18 @@ TEST_CASE("primary manager assigns an address to a discovered unassigned node") 
   const auto assigned = FrameCodec::decode(transmitter.last);
   REQUIRE(std::holds_alternative<ProtocolFrame>(assigned));
   CHECK(std::get<ProtocolFrame>(assigned).identifier().kind() == MessageKind::kAddressAssign);
+}
+
+TEST_CASE("fresh primary persists and claims the reserved bootstrap address") {
+  MemoryStorage storage;
+  CapturingTransmitter transmitter;
+  NodeRuntime runtime{{1, 2, 3, 4, 5, 6}, CommissioningRole::kPrimary,
+                      storage, transmitter};
+
+  REQUIRE(storage.value);
+  CHECK(storage.value->value() == 0x001);
+  REQUIRE(runtime.address());
+  CHECK(runtime.address()->value() == 0x001);
 }
 
 TEST_CASE("unassigned node starts discovery with source address zero") {
@@ -61,6 +78,56 @@ TEST_CASE("unassigned node starts discovery with source address zero") {
   const auto& frame = std::get<ProtocolFrame>(decoded);
   CHECK(frame.identifier().kind() == MessageKind::kDiscoveryRequest);
   CHECK(frame.identifier().source().value() == 0);
+}
+
+TEST_CASE("unassigned node responds to its own discovery request") {
+  MemoryStorage storage;
+  CapturingTransmitter transmitter;
+  NodeRuntime runtime{{1, 2, 3, 4, 5, 6}, CommissioningRole::kNone,
+                      storage, transmitter};
+
+  runtime.tick(0);
+  REQUIRE(transmitter.count == 1);
+  for (std::uint32_t now = 1; now <= 1000 && transmitter.count == 1; ++now) {
+    runtime.tick(now);
+  }
+
+  REQUIRE(transmitter.count == 2);
+  const auto decoded = FrameCodec::decode(transmitter.last);
+  REQUIRE(std::holds_alternative<ProtocolFrame>(decoded));
+  const auto& frame = std::get<ProtocolFrame>(decoded);
+  CHECK(frame.identifier().kind() == MessageKind::kDiscoveryResponse);
+  CHECK(frame.identifier().source().value() == 0);
+  CHECK(frame.identifier().destination().value() == 0);
+  const auto& bytes = std::get<DiscoveryResponseFrame>(frame.payload()).bytes();
+  CHECK(bytes[1] == 1);
+  CHECK(bytes[6] == 6);
+}
+
+TEST_CASE("newly commissioned owner advertises each configured entity") {
+  MemoryStorage storage;
+  CapturingTransmitter transmitter;
+  NodeRuntime runtime{{1, 2, 3, 4, 5, 6}, CommissioningRole::kNone,
+                      storage, transmitter};
+  REQUIRE(runtime.register_owned_entity(EntityId{0x01010001}, EndpointId{1}));
+  const auto assign_id = CanIdentifier::create(Priority::kManagement,
+                                                MessageKind::kAddressAssign,
+                                                NodeAddress{0x1FF}, NodeAddress{1}, 0);
+  REQUIRE(assign_id);
+  runtime.receive({assign_id->to_raw(), true, 8, {1, 2, 3, 4, 5, 6, 2, 2}}, 0);
+
+  runtime.tick(0);
+  runtime.tick(375);
+  runtime.tick(750);
+  transmitter.count = 0;
+  runtime.tick(751);
+
+  REQUIRE(transmitter.count == 1);
+  const auto decoded = FrameCodec::decode(transmitter.last);
+  REQUIRE(std::holds_alternative<ProtocolFrame>(decoded));
+  const auto& frame = std::get<ProtocolFrame>(decoded);
+  CHECK(frame.identifier().kind() == MessageKind::kEntityClaim);
+  CHECK(frame.identifier().source().value() == 2);
 }
 
 TEST_CASE("runtime expires an entity mapping when its owner is offline") {
@@ -113,6 +180,36 @@ TEST_CASE("runtime answers entity resolution with a fresh claim") {
   CHECK(std::get<ProtocolFrame>(decoded).identifier().kind() == MessageKind::kEntityClaim);
 }
 
+TEST_CASE("runtime resolves every configured observed entity after commissioning") {
+  MemoryStorage storage;
+  storage.value = NodeAddress{1};
+  CapturingTransmitter transmitter;
+  NodeRuntime runtime{{1, 2, 3, 4, 5, 6}, CommissioningRole::kNone, storage, transmitter};
+  REQUIRE(runtime.register_observed_entity(EntityId{0x01020001}));
+  REQUIRE(runtime.register_observed_entity(EntityId{0x01020002}));
+
+  runtime.tick(0);
+  runtime.tick(375);
+  runtime.tick(750);
+  transmitter.count = 0;
+
+  runtime.tick(751);
+  REQUIRE(transmitter.count == 1);
+  auto decoded = FrameCodec::decode(transmitter.last);
+  REQUIRE(std::holds_alternative<ProtocolFrame>(decoded));
+  auto frame = std::get<ProtocolFrame>(decoded);
+  CHECK(frame.identifier().kind() == MessageKind::kEntityResolve);
+  CHECK(std::get<EntityResolveFrame>(frame.payload()).bytes()[2] == 0x01);
+
+  runtime.tick(752);
+  REQUIRE(transmitter.count == 2);
+  decoded = FrameCodec::decode(transmitter.last);
+  REQUIRE(std::holds_alternative<ProtocolFrame>(decoded));
+  frame = std::get<ProtocolFrame>(decoded);
+  CHECK(frame.identifier().kind() == MessageKind::kEntityResolve);
+  CHECK(std::get<EntityResolveFrame>(frame.payload()).bytes()[2] == 0x02);
+}
+
 TEST_CASE("runtime drains control traffic before management traffic") {
   MemoryStorage storage;
   storage.value = NodeAddress{1};
@@ -146,6 +243,53 @@ TEST_CASE("address conflict withdraws the higher uid claimant") {
   runtime.receive({id->to_raw(), true, 8, {1, 0, 0, 0, 0, 0, 1, 0}}, 10);
   CHECK_FALSE(runtime.address());
   CHECK(events.conflicts == 1);
+}
+
+TEST_CASE("address claim conflict retains the lower uid and broadcasts the winner") {
+  MemoryStorage storage;
+  storage.value = NodeAddress{3};
+  CapturingTransmitter transmitter;
+  NodeRuntime runtime{{1, 0, 0, 0, 0, 0}, CommissioningRole::kNone, storage, transmitter};
+  const auto id = CanIdentifier::create(Priority::kManagement, MessageKind::kAddressClaim,
+                                        NodeAddress{0x1FF}, NodeAddress{3}, 0);
+  REQUIRE(id);
+
+  runtime.receive({id->to_raw(), true, 8, {2, 0, 0, 0, 0, 0, 1, 0}}, 10);
+
+  REQUIRE(runtime.address());
+  CHECK(runtime.address()->value() == 3);
+  REQUIRE(runtime.drain_one());
+  const auto decoded = FrameCodec::decode(transmitter.last);
+  REQUIRE(std::holds_alternative<ProtocolFrame>(decoded));
+  CHECK(std::get<ProtocolFrame>(decoded).identifier().kind() == MessageKind::kAddressConflict);
+}
+
+TEST_CASE("address claim conflict withdraws the higher uid") {
+  MemoryStorage storage;
+  storage.value = NodeAddress{3};
+  CapturingTransmitter transmitter;
+  NodeRuntime runtime{{2, 0, 0, 0, 0, 0}, CommissioningRole::kNone, storage, transmitter};
+  const auto id = CanIdentifier::create(Priority::kManagement, MessageKind::kAddressClaim,
+                                        NodeAddress{0x1FF}, NodeAddress{3}, 0);
+  REQUIRE(id);
+
+  runtime.receive({id->to_raw(), true, 8, {1, 0, 0, 0, 0, 0, 1, 0}}, 10);
+
+  CHECK_FALSE(runtime.address());
+}
+
+TEST_CASE("address claim conflict compares node uid as a little endian integer") {
+  MemoryStorage storage;
+  storage.value = NodeAddress{3};
+  CapturingTransmitter transmitter;
+  NodeRuntime runtime{{0, 0, 0, 0, 0, 1}, CommissioningRole::kNone, storage, transmitter};
+  const auto id = CanIdentifier::create(Priority::kManagement, MessageKind::kAddressClaim,
+                                        NodeAddress{0x1FF}, NodeAddress{3}, 0);
+  REQUIRE(id);
+
+  runtime.receive({id->to_raw(), true, 8, {0xFF, 0, 0, 0, 0, 0, 1, 0}}, 10);
+
+  CHECK_FALSE(runtime.address());
 }
 
 TEST_CASE("newer pending state replaces an older state for the same endpoint") {

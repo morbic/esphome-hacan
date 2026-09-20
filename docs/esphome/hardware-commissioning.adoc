@@ -1,0 +1,114 @@
+= Hardware commissioning procedure
+:toc: left
+:sectnums:
+
+This procedure validates the initial ESPHome HACAN component on two physical
+ESP32 nodes. It validates commissioning and the volatile entity directory; it
+does not yet validate an ESPHome endpoint platform.
+
+== Prerequisites
+
+* Two ESP32 development boards with CAN transceivers and the physical bus
+  wiring already prepared at 125 kbit/s.
+* A serial connection to each board for ESPHome logs.
+* Optionally, a passive CAN monitor such as a USB-CAN adapter for frame capture.
+* ESPHome installed in the local shell.
+
+The included examples use the ESP32 built-in CAN controller on `GPIO5` (TX)
+and `GPIO4` (RX). Change these pins, the board, or the framework in both YAML
+files when the physical hardware differs.
+
+== Prepare the firmware
+
+The example files load this repository's component through the standard
+ESPHome local external-component mechanism:
+
+[source,yaml]
+----
+external_components:
+  - source:
+      type: local
+      path: ../components
+----
+
+The path is relative to the YAML file. Keep the YAML files in the repository's
+`examples` directory, or adjust the path when copying them elsewhere.
+
+Flash the commissioning manager first:
+
+[source,shell]
+----
+esphome run examples/commissioning-primary.yaml --device /dev/ttyUSB0
+----
+
+Then flash the peer:
+
+[source,shell]
+----
+esphome run examples/commissioning-peer.yaml --device /dev/ttyUSB1
+----
+
+Replace device paths with the serial ports assigned by the host. The primary
+observes EntityId `0x01010001`; the peer owns the same EntityId at endpoint
+`0x01`.
+
+== Scenario 1: Cold start and address assignment
+
+. Erase persistent storage on both boards. For a standard ESP32, use
+  `esptool.py --chip esp32 --port /dev/ttyUSB0 erase_flash`, then repeat with
+  the peer's serial port. On macOS, the port normally has the form
+  `/dev/cu.usbserial-*` or `/dev/cu.usbmodem*`.
+. Flash and power the primary alone. Its log must contain `Stored commissioned
+  address: 0x001` and the HACAN configuration dump must show `0x001`.
+. Power the peer. It first emits `DISCOVERY_REQUEST` and a delayed source-zero
+  `DISCOVERY_RESPONSE`; the primary assigns the next free address.
+. Confirm that the peer log contains `Stored commissioned address: 0x002`.
+. Capture the two `ADDRESS_CLAIM` frames from each node. The primary claims
+  `0x001`; the peer claims `0x002`.
+
+Expected result: both addresses are persisted and no address-conflict log is
+present.
+
+== Scenario 2: Entity directory recovery
+
+. Keep both nodes powered after Scenario 1.
+. Confirm that the peer sends `ENTITY_CLAIM` for EntityId `0x01010001` and
+  endpoint `0x01` after completing its address claims.
+. The primary sends `ENTITY_RESOLVE` for that EntityId.
+. Confirm the primary log reports `Entity 0x01010001 is available at 0x002
+  endpoint 0x01`.
+
+Expected result: the primary stores the peer's volatile entity mapping. The
+same claim may be observed more than once; repeated claims are idempotent.
+
+== Scenario 3: Restart and persisted address
+
+. Power-cycle only the peer without erasing its flash.
+. Confirm it reuses `0x002`, sends two `ADDRESS_CLAIM` frames, and does not wait
+  for a new assignment.
+. Confirm that entity availability returns after its fresh `ENTITY_CLAIM`.
+
+Expected result: a normal restart does not alter either node's address.
+
+== Scenario 4: Offline detection and replacement
+
+. Disconnect or power off the peer.
+. Wait at least 105 seconds after its last valid frame.
+. Confirm that the primary log reports `Entity 0x01010001 is unavailable`.
+. Flash a replacement peer configuration that owns `0x01010001`, connect it,
+  and allow it to complete commissioning.
+. Confirm that the primary logs a new available mapping for the replacement
+  address.
+
+Expected result: entity mappings are RAM-only, expire after the offline timeout,
+and are rebuilt from a fresh claim.
+
+== Scenario 5: Address conflict
+
+. Keep the primary running at `0x001`.
+. Program a second primary only for this isolated test, then connect it to the
+  same bus.
+. Observe an `ADDRESS_CONFLICT` and confirm that the node with the numerically
+  higher NodeUID withdraws and stops normal traffic.
+
+Do not operate two primary nodes outside this controlled conflict test.

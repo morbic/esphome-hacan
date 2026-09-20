@@ -4,15 +4,15 @@
 
 == Status
 
-This documentation describes the approved architecture for the first ESPHome
-implementation. The implementation has not yet been created. HACAN protocol
-version `1.0.0-draft.1` remains a draft until it has been implemented and
-tested on representative physical wiring.
+This documentation describes the initial ESPHome implementation. HACAN
+protocol version `1.0.0-draft.1` remains a draft until it has been tested on
+representative physical wiring.
 
 == Documentation
 
 * xref:architecture.adoc[Implementation architecture]
-* xref:configuration.adoc[Planned YAML configuration]
+* xref:configuration.adoc[YAML configuration]
+* xref:hardware-commissioning.adoc[Hardware commissioning procedure]
 * xref:assumptions.adoc[Accepted assumptions]
 * xref:limitations.adoc[Deliberately deferred functionality]
 * xref:decisions/index.adoc[ESPHome implementation decision records]
