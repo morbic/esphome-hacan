@@ -117,6 +117,7 @@ class NodeRuntime {
   std::uint32_t next_discovery_ms_{0};
   std::uint8_t discovery_attempt_{0};
   std::uint8_t claims_sent_{0};
+  bool claim_schedule_initialized_{false};
   std::uint8_t owned_claim_index_{0};
   std::uint8_t observed_resolve_index_{0};
   std::uint8_t sequence_{0};

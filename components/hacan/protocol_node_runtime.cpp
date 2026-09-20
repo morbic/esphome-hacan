@@ -15,6 +15,20 @@ std::uint32_t discovery_response_delay(const NodeUid& uid,
   return hash % window;
 }
 
+std::uint32_t uid_hash(const NodeUid& uid) {
+  std::uint32_t hash = 2166136261U;
+  for (const auto byte : uid) hash = (hash ^ byte) * 16777619U;
+  return hash;
+}
+
+std::uint32_t claim_start_delay(const NodeUid& uid) {
+  return 1000U + (uid_hash(uid) % 1501U);
+}
+
+std::uint32_t claim_interval(const NodeUid& uid) {
+  return 250U + (uid_hash(uid) % 251U);
+}
+
 }  // namespace
 
 NodeRuntime::NodeRuntime(NodeUid uid, CommissioningRole role, IAddressStorage& storage,
@@ -42,6 +56,10 @@ void NodeRuntime::tick(std::uint32_t now_ms) {
     drain_one();
     return;
   }
+  if (address_ && !claim_schedule_initialized_) {
+    next_claim_ms_ = now_ms + claim_start_delay(uid_);
+    claim_schedule_initialized_ = true;
+  }
   if (!address_ && now_ms >= next_discovery_ms_) {
     send_discovery_request(now_ms);
     drain_one();
@@ -52,7 +70,7 @@ void NodeRuntime::tick(std::uint32_t now_ms) {
     drain_one();
     return;
   }
-  if (address_ && now_ms >= next_heartbeat_ms_) {
+  if (address_ && claims_sent_ == 2 && now_ms >= next_heartbeat_ms_) {
     send_heartbeat(now_ms);
     return;
   }
@@ -164,6 +182,7 @@ void NodeRuntime::handle(const ProtocolFrame& frame, std::uint32_t now_ms) {
         address_ = assigned;
         allocated_[assigned.value()] = true;
         claims_sent_ = 0;
+        claim_schedule_initialized_ = false;
         owned_claim_index_ = 0;
         observed_resolve_index_ = 0;
         next_claim_ms_ = now_ms;
@@ -355,6 +374,8 @@ void NodeRuntime::expire_offline(std::uint32_t now_ms) {
 void NodeRuntime::withdraw_address() {
   address_.reset();
   next_heartbeat_ms_ = 0;
+  claims_sent_ = 0;
+  claim_schedule_initialized_ = false;
 }
 
 void NodeRuntime::send_claim() {
@@ -368,7 +389,7 @@ void NodeRuntime::send_claim() {
                                         NodeAddress{0x1FF}, *address_, 0);
   if (payload && id) enqueue(ProtocolFrame{*id, *payload});
   ++claims_sent_;
-  next_claim_ms_ += 375;
+  next_claim_ms_ += claim_interval(uid_);
 }
 
 void NodeRuntime::send_entity_claim(EntityId entity, EndpointId endpoint) {

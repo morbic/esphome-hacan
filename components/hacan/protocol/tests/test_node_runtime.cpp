@@ -66,6 +66,25 @@ TEST_CASE("fresh primary persists and claims the reserved bootstrap address") {
   CHECK(runtime.address()->value() == 0x001);
 }
 
+TEST_CASE("commissioned node delays its first address claim") {
+  MemoryStorage storage;
+  storage.value = NodeAddress{1};
+  CapturingTransmitter transmitter;
+  NodeRuntime runtime{{1, 2, 3, 4, 5, 6}, CommissioningRole::kNone,
+                      storage, transmitter};
+
+  runtime.tick(0);
+  CHECK(transmitter.count == 0);
+  for (std::uint32_t now = 1; now <= 2000 && transmitter.count == 0; ++now) {
+    runtime.tick(now);
+  }
+
+  REQUIRE(transmitter.count == 1);
+  const auto decoded = FrameCodec::decode(transmitter.last);
+  REQUIRE(std::holds_alternative<ProtocolFrame>(decoded));
+  CHECK(std::get<ProtocolFrame>(decoded).identifier().kind() == MessageKind::kAddressClaim);
+}
+
 TEST_CASE("unassigned node starts discovery with source address zero") {
   MemoryStorage storage;
   CapturingTransmitter transmitter;
@@ -116,18 +135,17 @@ TEST_CASE("newly commissioned owner advertises each configured entity") {
   REQUIRE(assign_id);
   runtime.receive({assign_id->to_raw(), true, 8, {1, 2, 3, 4, 5, 6, 2, 2}}, 0);
 
-  runtime.tick(0);
-  runtime.tick(375);
-  runtime.tick(750);
-  transmitter.count = 0;
-  runtime.tick(751);
-
-  REQUIRE(transmitter.count == 1);
-  const auto decoded = FrameCodec::decode(transmitter.last);
-  REQUIRE(std::holds_alternative<ProtocolFrame>(decoded));
-  const auto& frame = std::get<ProtocolFrame>(decoded);
-  CHECK(frame.identifier().kind() == MessageKind::kEntityClaim);
-  CHECK(frame.identifier().source().value() == 2);
+  bool claimed = false;
+  for (std::uint32_t now = 0; now <= 5000 && !claimed; ++now) {
+    runtime.tick(now);
+    const auto decoded = FrameCodec::decode(transmitter.last);
+    if (const auto* frame = std::get_if<ProtocolFrame>(&decoded);
+        frame && frame->identifier().kind() == MessageKind::kEntityClaim) {
+      CHECK(frame->identifier().source().value() == 2);
+      claimed = true;
+    }
+  }
+  CHECK(claimed);
 }
 
 TEST_CASE("runtime expires an entity mapping when its owner is offline") {
@@ -153,13 +171,15 @@ TEST_CASE("runtime sends a heartbeat for a commissioned node") {
   CapturingTransmitter transmitter;
   NodeRuntime runtime{{1, 2, 3, 4, 5, 6}, CommissioningRole::kNone,
                       storage, transmitter};
-  runtime.tick(0);
-  runtime.tick(375);
-  runtime.tick(750);
-  REQUIRE(transmitter.count == 3);
-  const auto decoded = FrameCodec::decode(transmitter.last);
-  REQUIRE(std::holds_alternative<ProtocolFrame>(decoded));
-  CHECK(std::get<ProtocolFrame>(decoded).identifier().kind() == MessageKind::kHeartbeat);
+  bool heartbeat = false;
+  for (std::uint32_t now = 0; now <= 5000 && !heartbeat; ++now) {
+    runtime.tick(now);
+    const auto decoded = FrameCodec::decode(transmitter.last);
+    if (const auto* frame = std::get_if<ProtocolFrame>(&decoded)) {
+      heartbeat = frame->identifier().kind() == MessageKind::kHeartbeat;
+    }
+  }
+  CHECK(heartbeat);
 }
 
 TEST_CASE("runtime answers entity resolution with a fresh claim") {
@@ -188,26 +208,20 @@ TEST_CASE("runtime resolves every configured observed entity after commissioning
   REQUIRE(runtime.register_observed_entity(EntityId{0x01020001}));
   REQUIRE(runtime.register_observed_entity(EntityId{0x01020002}));
 
-  runtime.tick(0);
-  runtime.tick(375);
-  runtime.tick(750);
-  transmitter.count = 0;
-
-  runtime.tick(751);
-  REQUIRE(transmitter.count == 1);
-  auto decoded = FrameCodec::decode(transmitter.last);
-  REQUIRE(std::holds_alternative<ProtocolFrame>(decoded));
-  auto frame = std::get<ProtocolFrame>(decoded);
-  CHECK(frame.identifier().kind() == MessageKind::kEntityResolve);
-  CHECK(std::get<EntityResolveFrame>(frame.payload()).bytes()[2] == 0x01);
-
-  runtime.tick(752);
-  REQUIRE(transmitter.count == 2);
-  decoded = FrameCodec::decode(transmitter.last);
-  REQUIRE(std::holds_alternative<ProtocolFrame>(decoded));
-  frame = std::get<ProtocolFrame>(decoded);
-  CHECK(frame.identifier().kind() == MessageKind::kEntityResolve);
-  CHECK(std::get<EntityResolveFrame>(frame.payload()).bytes()[2] == 0x02);
+  std::array<std::uint8_t, 2> resolved{};
+  std::uint8_t resolved_count = 0;
+  for (std::uint32_t now = 0; now <= 5000 && resolved_count < resolved.size(); ++now) {
+    runtime.tick(now);
+    const auto decoded = FrameCodec::decode(transmitter.last);
+    if (const auto* frame = std::get_if<ProtocolFrame>(&decoded);
+        frame && frame->identifier().kind() == MessageKind::kEntityResolve) {
+      resolved[resolved_count++] =
+          std::get<EntityResolveFrame>(frame->payload()).bytes()[2];
+    }
+  }
+  REQUIRE(resolved_count == 2);
+  CHECK(resolved[0] == 0x01);
+  CHECK(resolved[1] == 0x02);
 }
 
 TEST_CASE("runtime drains control traffic before management traffic") {
