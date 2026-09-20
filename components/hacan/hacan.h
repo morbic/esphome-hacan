@@ -16,8 +16,6 @@ class HacanComponent : public Component, public ::hacan::protocol::IFrameTransmi
  public:
   void set_canbus(canbus::Canbus *canbus) { canbus_ = canbus; }
   void set_commissioning_role(uint8_t role);
-  void add_owned_entity(uint32_t entity, uint8_t endpoint);
-  void add_observed_entity(uint32_t entity);
   void add_owned_endpoint(uint32_t entity, uint8_t endpoint,
                           ::hacan::protocol::IEndpointHandler *handler);
   void add_state_listener(::hacan::protocol::IStateListener *listener);
@@ -46,8 +44,6 @@ class HacanComponent : public Component, public ::hacan::protocol::IFrameTransmi
 
   canbus::Canbus *canbus_{nullptr};
   ::hacan::protocol::CommissioningRole role_{::hacan::protocol::CommissioningRole::kNone};
-  std::array<std::optional<::hacan::protocol::EntityLocation>, kMaxConfiguredEntities> owned_{};
-  std::array<std::optional<::hacan::protocol::EntityId>, kMaxConfiguredEntities> observed_{};
   struct OwnedEndpoint {
     ::hacan::protocol::EntityId entity;
     ::hacan::protocol::EndpointId endpoint;

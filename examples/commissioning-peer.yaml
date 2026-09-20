@@ -23,8 +23,21 @@ canbus:
     rx_pin: GPIO4
 
 hacan:
+  id: hacan_node
   canbus_id: hacan_bus
   commissioning_role: none
-  owned_entities:
-    - endpoint: 0x01
-      entity_id: 0x01010001
+
+binary_sensor:
+  - platform: gpio
+    id: in01
+    pin:
+      number: GPIO14
+      mode: INPUT_PULLUP
+      inverted: true
+  - platform: hacan
+    id: hacan_in01
+    hacan_id: hacan_node
+    source_id: in01
+    entity_id: 0x01010001
+    endpoint: 0x01
+    internal: true

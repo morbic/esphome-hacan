@@ -73,5 +73,12 @@ jobs:
           esphome config examples/endpoints.yaml
           esphome config examples/endpoints-arduino.yaml
 
+      - name: Reject legacy manual entity lists
+        run: |
+          if esphome config tests/configurations/legacy-entity-lists.yaml; then
+            echo "Legacy owned_entities/observed_entities configuration was accepted"
+            exit 1
+          fi
+
       - name: Compile example
         run: esphome compile ${{ matrix.config }}

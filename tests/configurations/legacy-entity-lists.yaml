@@ -1,5 +1,5 @@
 esphome:
-  name: hacan-commissioning-primary
+  name: hacan-legacy-entity-lists
 
 esp32:
   board: esp32dev
@@ -9,10 +9,7 @@ esp32:
 external_components:
   - source:
       type: local
-      path: ../components
-
-logger:
-  level: DEBUG
+      path: ../../components
 
 canbus:
   - platform: esp32_can
@@ -24,4 +21,8 @@ canbus:
 
 hacan:
   canbus_id: hacan_bus
-  commissioning_role: primary
+  owned_entities:
+    - entity_id: 0x01010001
+      endpoint: 0x01
+  observed_entities:
+    - entity_id: 0x01020001

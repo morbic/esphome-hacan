@@ -13,30 +13,6 @@ void HacanComponent::set_commissioning_role(uint8_t role) {
   role_ = static_cast<::hacan::protocol::CommissioningRole>(role);
 }
 
-void HacanComponent::add_owned_entity(uint32_t entity, uint8_t endpoint) {
-  for (auto &configured : owned_) {
-    if (!configured) {
-      configured = ::hacan::protocol::EntityLocation{
-          ::hacan::protocol::EntityId{entity}, ::hacan::protocol::NodeAddress{0},
-          ::hacan::protocol::EndpointId{endpoint}};
-      return;
-    }
-  }
-  ESP_LOGE(TAG, "Too many owned entities; maximum is %u",
-           static_cast<unsigned>(kMaxConfiguredEntities));
-}
-
-void HacanComponent::add_observed_entity(uint32_t entity) {
-  for (auto &configured : observed_) {
-    if (!configured) {
-      configured = ::hacan::protocol::EntityId{entity};
-      return;
-    }
-  }
-  ESP_LOGE(TAG, "Too many observed entities; maximum is %u",
-           static_cast<unsigned>(kMaxConfiguredEntities));
-}
-
 void HacanComponent::add_owned_endpoint(
     uint32_t entity, uint8_t endpoint, ::hacan::protocol::IEndpointHandler *handler) {
   for (auto &configured : owned_endpoints_) {
@@ -75,12 +51,6 @@ void HacanComponent::setup() {
   for (uint8_t index = 0; index < uid.size(); ++index) uid[index] = uid_[index];
   address_preference_ = global_preferences->make_preference<uint16_t>(0x48414341U);
   runtime_.emplace(uid, role_, *this, *this, this);
-  for (const auto &entity : owned_) {
-    if (entity) runtime_->register_owned_entity(entity->entity, entity->endpoint);
-  }
-  for (const auto &entity : observed_) {
-    if (entity) runtime_->register_observed_entity(*entity);
-  }
   for (const auto &endpoint : owned_endpoints_) {
     if (!endpoint) continue;
     runtime_->register_owned_entity(endpoint->entity, endpoint->endpoint);
@@ -171,12 +141,13 @@ void HacanComponent::dump_config() {
   } else {
     ESP_LOGCONFIG(TAG, "  Commissioned address: unassigned");
   }
-  uint8_t owned_count = 0;
-  uint8_t observed_count = 0;
-  for (const auto &entity : owned_) owned_count += entity.has_value();
-  for (const auto &entity : observed_) observed_count += entity.has_value();
-  ESP_LOGCONFIG(TAG, "  Owned entities: %u", static_cast<unsigned>(owned_count));
-  ESP_LOGCONFIG(TAG, "  Observed entities: %u", static_cast<unsigned>(observed_count));
+  uint8_t endpoint_count = 0;
+  uint8_t state_listener_count = 0;
+  for (const auto &endpoint : owned_endpoints_) endpoint_count += endpoint.has_value();
+  for (const auto *listener : state_listeners_) state_listener_count += listener != nullptr;
+  ESP_LOGCONFIG(TAG, "  Owned endpoint profiles: %u", static_cast<unsigned>(endpoint_count));
+  ESP_LOGCONFIG(TAG, "  State source subscriptions: %u",
+                static_cast<unsigned>(state_listener_count));
   ESP_LOGCONFIG(TAG, "  CAN frames RX/TX/malformed: %u/%u/%u",
                 static_cast<unsigned>(rx_frames_), static_cast<unsigned>(tx_frames_),
                 static_cast<unsigned>(malformed_frames_));
