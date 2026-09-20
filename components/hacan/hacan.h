@@ -18,6 +18,9 @@ class HacanComponent : public Component, public ::hacan::protocol::IFrameTransmi
   void set_commissioning_role(uint8_t role);
   void add_owned_entity(uint32_t entity, uint8_t endpoint);
   void add_observed_entity(uint32_t entity);
+  void add_owned_endpoint(uint32_t entity, uint8_t endpoint,
+                          ::hacan::protocol::IEndpointHandler *handler);
+  bool publish_bool_state(uint8_t endpoint, bool value);
   void setup() override;
   void loop() override;
   void dump_config() override;
@@ -44,6 +47,12 @@ class HacanComponent : public Component, public ::hacan::protocol::IFrameTransmi
   ::hacan::protocol::CommissioningRole role_{::hacan::protocol::CommissioningRole::kNone};
   std::array<std::optional<::hacan::protocol::EntityLocation>, kMaxConfiguredEntities> owned_{};
   std::array<std::optional<::hacan::protocol::EntityId>, kMaxConfiguredEntities> observed_{};
+  struct OwnedEndpoint {
+    ::hacan::protocol::EntityId entity;
+    ::hacan::protocol::EndpointId endpoint;
+    ::hacan::protocol::IEndpointHandler *handler;
+  };
+  std::array<std::optional<OwnedEndpoint>, kMaxConfiguredEntities> owned_endpoints_{};
   std::optional<::hacan::protocol::NodeRuntime> runtime_{};
   ESPPreferenceObject address_preference_{};
   std::array<uint8_t, 6> uid_{};

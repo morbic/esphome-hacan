@@ -20,6 +20,8 @@ components/hacan/
   __init__.py
   hacan.h
   hacan.cpp
+  binary_sensor/
+  switch/
   protocol_*.h
   protocol_*.cpp
   protocol/
@@ -87,9 +89,9 @@ runtime can update `rx_unknown_kind` rather than `rx_malformed`.
 
 * `IFrameTransmitter` accepts completed `RawCanFrame` values.
 * `IAddressStorage` loads and durably saves the commissioned `NodeAddress`.
-* `INodeEvents` receives decoded `STATE`, `EVENT`, `COMMAND`, and directory
-  changes for local consumers.
-* Endpoint handlers are registered with the runtime by later ESPHome platforms.
+* `INodeEvents` receives entity-directory changes for local consumers.
+* `IEndpointHandler` accepts an addressed command for one local endpoint and
+  returns a protocol `Status`.
 
 The ESPHome adapter implements these ports. Host tests replace them with simple
 fakes, making lifecycle and recovery behavior deterministic without ESP32
@@ -97,14 +99,22 @@ hardware.
 
 == Endpoint boundary
 
-Endpoint platforms will register an endpoint identifier, capabilities, state
-reader, state publisher, and command handler with `NodeRuntime`. The runtime
-does not infer ownership from arbitrary Home Assistant entities. A platform
-must explicitly declare whether it owns an EntityId or observes one.
+Endpoint platforms explicitly declare their owned EntityId and EndpointId to
+`HacanComponent`; ownership is then registered in `NodeRuntime` before normal
+operation begins. The runtime does not infer ownership from arbitrary Home
+Assistant entities. A `COMMAND` addressed to an unregistered endpoint returns
+`UNSUPPORTED`; duplicate commands reuse their initial acknowledgement status
+without invoking the handler again.
 
-Until endpoint platforms exist, the base component can advertise configured
-owned EntityIds and process directory traffic, but it has no physical endpoint
-handler. Commands for an unregistered handler are rejected with `UNSUPPORTED`.
+The first two profiles are deliberately narrow:
+
+* `binary_sensor: platform: hacan` mirrors an existing local binary sensor and
+  publishes its changes as `STATE<bool>`.
+* `switch: platform: hacan` owns a local `output`, applies received
+  `COMMAND<bool>`, and publishes the resulting `STATE<bool>`.
+
+Neither profile sends `EVENT`; momentary-button semantics are a separate
+endpoint profile.
 
 == Queue policy
 

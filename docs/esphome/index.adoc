@@ -19,12 +19,13 @@ representative physical wiring.
 
 == Scope of the first implementation step
 
-The first step provides a standalone C++ protocol library and the base
-`hacan:` ESPHome component. The library encodes, decodes, and validates every
-message kind defined by protocol version 1. The base component provides node
-lifecycle, commissioning, entity directory behavior, bounded transmit queues,
-and an API for later ESPHome endpoint platforms.
+The first step provides a standalone C++ protocol library, the base `hacan:`
+ESPHome component, and two endpoint profiles. The library encodes, decodes,
+and validates every message kind defined by protocol version 1. The base
+component provides node lifecycle, commissioning, entity directory behavior,
+and bounded transmit queues.
 
-No `hacan.light`, `hacan.binary_sensor`, `hacan.sensor`, or other endpoint
-platform is included in this step. Their semantic mapping is intentionally a
-subsequent design and implementation step.
+`binary_sensor: platform: hacan` publishes a local bistable input as
+`STATE<bool>`. `switch: platform: hacan` owns a local binary output, accepts
+`COMMAND<bool>`, and publishes `STATE<bool>` after each applied change.
+Additional endpoint profiles remain deferred.

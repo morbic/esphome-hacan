@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include "protocol_node_runtime.h"
+#include "protocol_payload_command.h"
 
 namespace hacan::protocol {
 namespace {
@@ -32,6 +33,23 @@ class CapturingEvents final : public INodeEvents {
   std::uint8_t available{0};
   std::uint8_t unavailable{0};
   std::uint8_t conflicts{0};
+};
+
+class CapturingEndpoint final : public IEndpointHandler {
+ public:
+  explicit CapturingEndpoint(EndpointId endpoint) : endpoint_(endpoint) {}
+
+  EndpointId endpoint() const override { return endpoint_; }
+  Status command(TypedValue value) override {
+    ++commands;
+    last_value = value;
+    return result;
+  }
+
+  EndpointId endpoint_;
+  Status result{Status::kAccepted};
+  std::uint8_t commands{0};
+  TypedValue last_value{DataType::kNull, {0, 0, 0, 0}};
 };
 
 TEST_CASE("primary manager assigns an address to a discovered unassigned node") {
@@ -180,6 +198,90 @@ TEST_CASE("runtime sends a heartbeat for a commissioned node") {
     }
   }
   CHECK(heartbeat);
+}
+
+TEST_CASE("runtime publishes an owned boolean state") {
+  MemoryStorage storage;
+  storage.value = NodeAddress{1};
+  CapturingTransmitter transmitter;
+  NodeRuntime runtime{{1, 2, 3, 4, 5, 6}, CommissioningRole::kNone, storage, transmitter};
+  REQUIRE(runtime.register_owned_entity(EntityId{0x01010001}, EndpointId{3}));
+
+  CHECK(runtime.publish_state(EndpointId{3}, TypedValue{DataType::kBool, {1, 0, 0, 0}}));
+  REQUIRE(runtime.drain_one());
+
+  const auto decoded = FrameCodec::decode(transmitter.last);
+  REQUIRE(std::holds_alternative<ProtocolFrame>(decoded));
+  const auto& frame = std::get<ProtocolFrame>(decoded);
+  CHECK(frame.identifier().kind() == MessageKind::kState);
+  CHECK(frame.identifier().source().value() == 1);
+  const auto& bytes = std::get<StateFrame>(frame.payload()).bytes();
+  CHECK(bytes[1] == 3);
+  CHECK(bytes[2] == static_cast<std::uint8_t>(DataType::kBool));
+  CHECK(bytes[4] == 1);
+}
+
+TEST_CASE("runtime dispatches a boolean command to a registered endpoint") {
+  MemoryStorage storage;
+  storage.value = NodeAddress{1};
+  CapturingTransmitter transmitter;
+  NodeRuntime runtime{{1, 2, 3, 4, 5, 6}, CommissioningRole::kNone, storage, transmitter};
+  CapturingEndpoint endpoint{EndpointId{3}};
+  REQUIRE(runtime.register_endpoint(endpoint));
+
+  const auto identifier = CanIdentifier::create(Priority::kControl, MessageKind::kCommand,
+                                                 NodeAddress{1}, NodeAddress{2}, 0);
+  const auto payload = CommandPayload::create(0x42, EndpointId{3},
+                                              TypedValue{DataType::kBool, {1, 0, 0, 0}}, 1);
+  REQUIRE(identifier);
+  REQUIRE(payload);
+  const auto wire_payload = CommandFrame::decode(payload->encode());
+  REQUIRE(wire_payload);
+  const auto encoded = FrameCodec::encode(ProtocolFrame{*identifier, *wire_payload});
+  REQUIRE(std::holds_alternative<RawCanFrame>(encoded));
+
+  runtime.receive(std::get<RawCanFrame>(encoded), 100);
+
+  REQUIRE(endpoint.commands == 1);
+  CHECK(endpoint.last_value.type() == DataType::kBool);
+  CHECK(endpoint.last_value.bytes()[0] == 1);
+  REQUIRE(runtime.drain_one());
+  const auto decoded = FrameCodec::decode(transmitter.last);
+  REQUIRE(std::holds_alternative<ProtocolFrame>(decoded));
+  const auto& ack = std::get<ProtocolFrame>(decoded);
+  CHECK(ack.identifier().kind() == MessageKind::kAck);
+  CHECK(std::get<AckFrame>(ack.payload()).bytes()[3] == static_cast<std::uint8_t>(Status::kAccepted));
+}
+
+TEST_CASE("runtime repeats the original acknowledgement for a duplicate command") {
+  MemoryStorage storage;
+  storage.value = NodeAddress{1};
+  CapturingTransmitter transmitter;
+  NodeRuntime runtime{{1, 2, 3, 4, 5, 6}, CommissioningRole::kNone, storage, transmitter};
+  CapturingEndpoint endpoint{EndpointId{3}};
+  REQUIRE(runtime.register_endpoint(endpoint));
+
+  const auto identifier = CanIdentifier::create(Priority::kControl, MessageKind::kCommand,
+                                                 NodeAddress{1}, NodeAddress{2}, 0);
+  const auto payload = CommandPayload::create(0x42, EndpointId{3},
+                                              TypedValue{DataType::kBool, {1, 0, 0, 0}}, 1);
+  REQUIRE(identifier);
+  REQUIRE(payload);
+  const auto wire_payload = CommandFrame::decode(payload->encode());
+  REQUIRE(wire_payload);
+  const auto encoded = FrameCodec::encode(ProtocolFrame{*identifier, *wire_payload});
+  REQUIRE(std::holds_alternative<RawCanFrame>(encoded));
+
+  runtime.receive(std::get<RawCanFrame>(encoded), 100);
+  REQUIRE(runtime.drain_one());
+  runtime.receive(std::get<RawCanFrame>(encoded), 101);
+
+  CHECK(endpoint.commands == 1);
+  REQUIRE(runtime.drain_one());
+  const auto decoded = FrameCodec::decode(transmitter.last);
+  REQUIRE(std::holds_alternative<ProtocolFrame>(decoded));
+  CHECK(std::get<AckFrame>(std::get<ProtocolFrame>(decoded).payload()).bytes()[3] ==
+        static_cast<std::uint8_t>(Status::kAccepted));
 }
 
 TEST_CASE("runtime answers entity resolution with a fresh claim") {

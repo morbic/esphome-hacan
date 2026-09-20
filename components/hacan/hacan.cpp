@@ -37,6 +37,27 @@ void HacanComponent::add_observed_entity(uint32_t entity) {
            static_cast<unsigned>(kMaxConfiguredEntities));
 }
 
+void HacanComponent::add_owned_endpoint(
+    uint32_t entity, uint8_t endpoint, ::hacan::protocol::IEndpointHandler *handler) {
+  for (auto &configured : owned_endpoints_) {
+    if (!configured) {
+      configured = OwnedEndpoint{::hacan::protocol::EntityId{entity},
+                                 ::hacan::protocol::EndpointId{endpoint}, handler};
+      return;
+    }
+  }
+  ESP_LOGE(TAG, "Too many HACAN endpoints; maximum is %u",
+           static_cast<unsigned>(kMaxConfiguredEntities));
+}
+
+bool HacanComponent::publish_bool_state(uint8_t endpoint, bool value) {
+  if (!runtime_) return false;
+  return runtime_->publish_state(::hacan::protocol::EndpointId{endpoint},
+                                 ::hacan::protocol::TypedValue{
+                                     ::hacan::protocol::DataType::kBool,
+                                     {static_cast<uint8_t>(value), 0, 0, 0}});
+}
+
 void HacanComponent::setup() {
   get_mac_address_raw(uid_.data());
   ::hacan::protocol::NodeUid uid{};
@@ -48,6 +69,11 @@ void HacanComponent::setup() {
   }
   for (const auto &entity : observed_) {
     if (entity) runtime_->register_observed_entity(*entity);
+  }
+  for (const auto &endpoint : owned_endpoints_) {
+    if (!endpoint) continue;
+    runtime_->register_owned_entity(endpoint->entity, endpoint->endpoint);
+    if (endpoint->handler) runtime_->register_endpoint(*endpoint->handler);
   }
   canbus_->add_callback([this](uint32_t can_id, bool extended, bool remote,
                                const std::vector<uint8_t> &data) {

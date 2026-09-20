@@ -58,6 +58,61 @@ Future HACAN endpoint platforms register the same declarations automatically;
 these lists remain a low-level option for endpoints without a dedicated
 platform.
 
+== Binary sensor endpoint
+
+`binary_sensor: platform: hacan` mirrors a pre-existing local binary sensor.
+The source input retains responsibility for pin configuration and input
+filtering. The HACAN endpoint owns the declared EntityId and emits one
+`STATE<bool>` after every reported source change. It does not emit `EVENT`.
+
+[source,yaml]
+----
+binary_sensor:
+  - platform: gpio
+    id: in01
+    pin:
+      number: GPIO14
+      mode: INPUT_PULLUP
+      inverted: true
+  - platform: hacan
+    id: hacan_in01
+    hacan_id: hacan_node
+    source_id: in01
+    entity_id: 0x01010001
+    endpoint: 0x01
+    internal: true
+----
+
+`id` is required by ESPHome even when `internal: true` hides the mirrored
+endpoint from Home Assistant.
+
+== Switch endpoint
+
+`switch: platform: hacan` owns a local binary `output` and its EntityId. A
+local change from Home Assistant or an addressed `COMMAND<bool>` changes the
+output and publishes `STATE<bool>`. An acknowledged command returns its actual
+validation status; receiving the same command retry does not apply the output
+a second time.
+
+[source,yaml]
+----
+output:
+  - platform: gpio
+    id: out01
+    pin: GPIO27
+
+switch:
+  - platform: hacan
+    hacan_id: hacan_node
+    entity_id: 0x01020001
+    endpoint: 0x02
+    output: out01
+    name: Living room main light
+----
+
+The endpoint declarations above register ownership automatically. Do not repeat
+these EntityIds in `hacan.owned_entities`.
+
 == Commissioning roles
 
 `primary` enables the commissioning manager. It discovers nodes and issues

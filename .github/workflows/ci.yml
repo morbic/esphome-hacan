@@ -47,6 +47,10 @@ jobs:
             config: examples/minimal.yaml
           - framework: Arduino
             config: examples/minimal-arduino.yaml
+          - framework: ESP-IDF endpoints
+            config: examples/endpoints.yaml
+          - framework: Arduino endpoints
+            config: examples/endpoints-arduino.yaml
 
     steps:
       - name: Check out repository
@@ -66,6 +70,8 @@ jobs:
           esphome config examples/entities.yaml
           esphome config examples/commissioning-primary.yaml
           esphome config examples/commissioning-peer.yaml
+          esphome config examples/endpoints.yaml
+          esphome config examples/endpoints-arduino.yaml
 
       - name: Compile example
         run: esphome compile ${{ matrix.config }}

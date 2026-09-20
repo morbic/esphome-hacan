@@ -5,6 +5,7 @@
 #include <optional>
 
 #include "protocol_frame_codec.h"
+#include "protocol_payload_state.h"
 
 namespace hacan::protocol {
 
@@ -34,6 +35,13 @@ class INodeEvents {
   virtual void address_conflict(NodeAddress address) = 0;
 };
 
+class IEndpointHandler {
+ public:
+  virtual ~IEndpointHandler() = default;
+  [[nodiscard]] virtual EndpointId endpoint() const = 0;
+  virtual Status command(TypedValue value) = 0;
+};
+
 struct EntityLocation {
   EntityId entity{0};
   NodeAddress node{0};
@@ -51,6 +59,9 @@ class NodeRuntime {
   void tick(std::uint32_t now_ms);
   bool register_owned_entity(EntityId entity, EndpointId endpoint);
   bool register_observed_entity(EntityId entity);
+  bool register_endpoint(IEndpointHandler& endpoint);
+  bool publish_state(EndpointId endpoint, TypedValue value,
+                     StateQuality quality = StateQuality::kValid);
   bool enqueue(const ProtocolFrame& frame);
   bool drain_one();
   [[nodiscard]] std::optional<NodeAddress> address() const { return address_; }
@@ -72,8 +83,12 @@ class NodeRuntime {
   void send_entity_claim(EntityId entity, EndpointId endpoint);
   void send_entity_resolve(EntityId entity);
   void send_address_conflict(const NodeUid& winner);
-  void acknowledge(const ProtocolFrame& frame);
-  bool is_duplicate(const ProtocolFrame& frame, std::uint32_t now_ms);
+  void acknowledge(const ProtocolFrame& frame, Status status);
+  [[nodiscard]] IEndpointHandler* endpoint_handler(EndpointId endpoint) const;
+  [[nodiscard]] bool owns_endpoint(EndpointId endpoint) const;
+  bool is_duplicate(const ProtocolFrame& frame, std::uint32_t now_ms,
+                    Status *previous_status = nullptr);
+  void set_duplicate_status(const ProtocolFrame& frame, Status status);
   [[nodiscard]] std::optional<NodeAddress> next_free_address() const;
 
   NodeUid uid_;
@@ -88,6 +103,7 @@ class NodeRuntime {
   std::array<std::optional<EntityLocation>, 32> entities_{};
   std::array<std::optional<EntityLocation>, 16> owned_entities_{};
   std::array<std::optional<EntityId>, 16> observed_entities_{};
+  std::array<IEndpointHandler*, 16> endpoint_handlers_{};
   std::array<RawCanFrame, 8> control_queue_{};
   std::array<RawCanFrame, 8> event_queue_{};
   std::array<RawCanFrame, 8> state_queue_{};
@@ -104,6 +120,7 @@ class NodeRuntime {
     std::uint8_t transaction{0};
     MessageKind kind{MessageKind::kProtocolError};
     std::uint32_t seen_ms{0};
+    Status status{Status::kUnsupported};
   };
   std::array<std::optional<Duplicate>, 16> duplicates_{};
   struct PendingDiscoveryResponse {

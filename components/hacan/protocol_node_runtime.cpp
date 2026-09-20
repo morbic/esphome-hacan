@@ -207,16 +207,26 @@ void NodeRuntime::handle(const ProtocolFrame& frame, std::uint32_t now_ms) {
     }
     return;
   }
-  if ((frame.identifier().kind() == MessageKind::kCommand ||
-       frame.identifier().kind() == MessageKind::kEvent) &&
-      frame.identifier().destination().value() != 0x1FF) {
-    const auto flags = frame.identifier().kind() == MessageKind::kCommand
-                           ? std::get<CommandFrame>(frame.payload()).bytes()[3]
-                           : std::get<EventFrame>(frame.payload()).bytes()[3];
-    if ((flags & 1U) != 0) {
-      is_duplicate(frame, now_ms);
-      acknowledge(frame);
+  if (frame.identifier().kind() == MessageKind::kCommand && address_ &&
+      frame.identifier().destination().value() == address_->value()) {
+    const auto& bytes = std::get<CommandFrame>(frame.payload()).bytes();
+    const TypedValue value{static_cast<DataType>(bytes[2]),
+                           {bytes[4], bytes[5], bytes[6], bytes[7]}};
+    Status status = Status::kUnsupported;
+    const bool duplicate = is_duplicate(frame, now_ms, &status);
+    if (!duplicate) {
+      if (auto* endpoint = endpoint_handler(EndpointId{bytes[1]})) {
+        status = endpoint->command(value);
+      }
+      set_duplicate_status(frame, status);
     }
+    if ((bytes[3] & 1U) != 0) acknowledge(frame, status);
+    return;
+  }
+  if (frame.identifier().kind() == MessageKind::kEvent && address_ &&
+      frame.identifier().destination().value() == address_->value()) {
+    const auto& bytes = std::get<EventFrame>(frame.payload()).bytes();
+    if ((bytes[3] & 1U) != 0) acknowledge(frame, Status::kAccepted);
     return;
   }
   if (frame.identifier().kind() != MessageKind::kDiscoveryResponse ||
@@ -271,6 +281,31 @@ bool NodeRuntime::register_observed_entity(EntityId entity) {
     }
   }
   return false;
+}
+
+bool NodeRuntime::register_endpoint(IEndpointHandler& endpoint) {
+  const auto id = endpoint.endpoint().value();
+  if (id == 0 || id == 0xFF) return false;
+  for (auto*& registered : endpoint_handlers_) {
+    if (!registered) {
+      registered = &endpoint;
+      return true;
+    }
+    if (registered->endpoint().value() == id) return registered == &endpoint;
+  }
+  return false;
+}
+
+bool NodeRuntime::publish_state(EndpointId endpoint, TypedValue value,
+                                StateQuality quality) {
+  if (!address_ || !owns_endpoint(endpoint)) return false;
+  const auto encoded_payload = StatePayload::create(sequence_++, endpoint, value, quality);
+  const auto id = CanIdentifier::create(Priority::kStateQuery, MessageKind::kState,
+                                        NodeAddress{0x1FF}, *address_, 0);
+  if (!encoded_payload || !id) return false;
+  const auto payload = StateFrame::decode(encoded_payload->encode());
+  if (!payload) return false;
+  return enqueue(ProtocolFrame{*id, *payload});
 }
 
 bool NodeRuntime::enqueue(const ProtocolFrame& frame) {
@@ -436,7 +471,8 @@ void NodeRuntime::send_address_conflict(const NodeUid& winner) {
   if (payload && id) enqueue(ProtocolFrame{*id, *payload});
 }
 
-bool NodeRuntime::is_duplicate(const ProtocolFrame& frame, std::uint32_t now_ms) {
+bool NodeRuntime::is_duplicate(const ProtocolFrame& frame, std::uint32_t now_ms,
+                               Status *previous_status) {
   const auto bytes = frame.identifier().kind() == MessageKind::kCommand
                          ? std::get<CommandFrame>(frame.payload()).bytes()
                          : std::get<EventFrame>(frame.payload()).bytes();
@@ -444,32 +480,60 @@ bool NodeRuntime::is_duplicate(const ProtocolFrame& frame, std::uint32_t now_ms)
     if (record && record->source.value() == frame.identifier().source().value() &&
         record->endpoint.value() == bytes[1] && record->transaction == bytes[0] &&
         record->kind == frame.identifier().kind() && now_ms - record->seen_ms <= 2000) {
+      if (previous_status != nullptr) *previous_status = record->status;
       return true;
     }
   }
   for (auto& record : duplicates_) {
     if (!record) {
       record = Duplicate{frame.identifier().source(), EndpointId{bytes[1]}, bytes[0],
-                         frame.identifier().kind(), now_ms};
+                         frame.identifier().kind(), now_ms, Status::kUnsupported};
       return false;
     }
   }
   duplicates_[0] = Duplicate{frame.identifier().source(), EndpointId{bytes[1]}, bytes[0],
-                             frame.identifier().kind(), now_ms};
+                             frame.identifier().kind(), now_ms, Status::kUnsupported};
   return false;
 }
 
-void NodeRuntime::acknowledge(const ProtocolFrame& frame) {
+void NodeRuntime::set_duplicate_status(const ProtocolFrame& frame, Status status) {
+  const auto& bytes = std::get<CommandFrame>(frame.payload()).bytes();
+  for (auto& record : duplicates_) {
+    if (record && record->source.value() == frame.identifier().source().value() &&
+        record->endpoint.value() == bytes[1] && record->transaction == bytes[0] &&
+        record->kind == frame.identifier().kind()) {
+      record->status = status;
+      return;
+    }
+  }
+}
+
+void NodeRuntime::acknowledge(const ProtocolFrame& frame, Status status) {
   if (!address_) return;
   const auto bytes = frame.identifier().kind() == MessageKind::kCommand
                          ? std::get<CommandFrame>(frame.payload()).bytes()
                          : std::get<EventFrame>(frame.payload()).bytes();
   const std::array<std::uint8_t, 8> ack{bytes[0], bytes[1],
-      static_cast<std::uint8_t>(frame.identifier().kind()), 0, 0, 0, 0, 0};
+      static_cast<std::uint8_t>(frame.identifier().kind()), static_cast<std::uint8_t>(status),
+      0, 0, 0, 0};
   const auto payload = AckFrame::decode(ack);
   const auto id = CanIdentifier::create(Priority::kControl, MessageKind::kAck,
                                         frame.identifier().source(), *address_, 0);
   if (payload && id) enqueue(ProtocolFrame{*id, *payload});
+}
+
+IEndpointHandler* NodeRuntime::endpoint_handler(EndpointId endpoint) const {
+  for (auto* handler : endpoint_handlers_) {
+    if (handler && handler->endpoint().value() == endpoint.value()) return handler;
+  }
+  return nullptr;
+}
+
+bool NodeRuntime::owns_endpoint(EndpointId endpoint) const {
+  for (const auto& owned : owned_entities_) {
+    if (owned && owned->endpoint.value() == endpoint.value()) return true;
+  }
+  return false;
 }
 
 std::optional<EntityLocation> NodeRuntime::resolve(EntityId entity) const {

@@ -7,9 +7,11 @@ It is deferred intentionally, not silently unsupported.
 
 == ESPHome endpoint platforms
 
-`hacan.light`, `hacan.binary_sensor`, `hacan.sensor`, `hacan.switch`, and other
-platforms are not included. Their mappings to `STATE`, `EVENT`, `COMMAND`,
-quality flags, and local behavior require separate endpoint-profile decisions.
+`hacan.light`, `hacan.sensor`, `hacan.cover`, `hacan.number`, `hacan.select`,
+and other profiles are not included. `hacan.binary_sensor` currently supports
+only bistable `STATE<bool>` publishing; a momentary-button `EVENT` profile is
+separate future work. `hacan.switch` currently supports only locally owned
+binary outputs; a proxy that commands a remote entity is also deferred.
 
 == Secondary commissioning takeover
 
