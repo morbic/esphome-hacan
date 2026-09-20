@@ -49,19 +49,44 @@ void HacanComponent::setup() {
   for (const auto &entity : observed_) {
     if (entity) runtime_->register_observed_entity(*entity);
   }
-  canbus_->add_callback([this](uint32_t can_id, bool extended, bool,
+  canbus_->add_callback([this](uint32_t can_id, bool extended, bool remote,
                                const std::vector<uint8_t> &data) {
-    if (data.size() != 8) return;
-    ::hacan::protocol::RawCanFrame frame{can_id, extended, static_cast<uint8_t>(data.size()), {}};
-    for (uint8_t index = 0; index < 8; ++index) frame.data[index] = data[index];
-    if (!std::holds_alternative<::hacan::protocol::ProtocolFrame>(
-            ::hacan::protocol::FrameCodec::decode(frame))) {
+    if (remote || data.size() != 8) {
+      ESP_LOGI(TAG, "RX rejected can_id=0x%08X extended=%s rtr=%s dlc=%u",
+               static_cast<unsigned>(can_id), extended ? "true" : "false",
+               remote ? "true" : "false", static_cast<unsigned>(data.size()));
       ++malformed_frames_;
       return;
     }
+    ::hacan::protocol::RawCanFrame frame{can_id, extended, static_cast<uint8_t>(data.size()), {}};
+    for (uint8_t index = 0; index < 8; ++index) frame.data[index] = data[index];
+    const auto decoded = ::hacan::protocol::FrameCodec::decode(frame);
+    if (!std::holds_alternative<::hacan::protocol::ProtocolFrame>(decoded)) {
+      log_frame("RX", frame, "rejected");
+      ++malformed_frames_;
+      return;
+    }
+    log_frame("RX", frame, "accepted");
     ++rx_frames_;
     runtime_->receive(frame, millis());
   });
+}
+
+void HacanComponent::log_frame(const char *direction,
+                               const ::hacan::protocol::RawCanFrame &frame,
+                               const char *result) {
+  const auto priority = static_cast<unsigned>((frame.can_id >> 26U) & 0x07U);
+  const auto kind = static_cast<unsigned>((frame.can_id >> 21U) & 0x1FU);
+  const auto destination = static_cast<unsigned>((frame.can_id >> 12U) & 0x1FFU);
+  const auto source = static_cast<unsigned>((frame.can_id >> 3U) & 0x1FFU);
+  const auto hop = static_cast<unsigned>(frame.can_id & 0x07U);
+  ESP_LOGI(TAG,
+           "%s %s can_id=0x%08X extended=%s rtr=false dlc=%u priority=%u kind=0x%02X "
+           "destination=0x%03X source=0x%03X hop=%u data=%02X%02X%02X%02X%02X%02X%02X%02X",
+           direction, result, static_cast<unsigned>(frame.can_id),
+           frame.extended ? "true" : "false", static_cast<unsigned>(frame.dlc), priority, kind,
+           destination, source, hop, frame.data[0], frame.data[1], frame.data[2], frame.data[3],
+           frame.data[4], frame.data[5], frame.data[6], frame.data[7]);
 }
 
 std::optional<::hacan::protocol::NodeAddress> HacanComponent::load() {
@@ -120,6 +145,7 @@ void HacanComponent::dump_config() {
 bool HacanComponent::transmit(const ::hacan::protocol::RawCanFrame &frame) {
   std::vector<uint8_t> data(frame.data.begin(), frame.data.end());
   const bool sent = canbus_->send_data(frame.can_id, frame.extended, data) == canbus::ERROR_OK;
+  log_frame("TX", frame, sent ? "sent" : "rejected");
   if (sent) ++tx_frames_;
   return sent;
 }

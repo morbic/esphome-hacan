@@ -37,6 +37,9 @@ class HacanComponent : public Component, public ::hacan::protocol::IFrameTransmi
  protected:
   static constexpr uint8_t kMaxConfiguredEntities = 16;
 
+  static void log_frame(const char *direction, const ::hacan::protocol::RawCanFrame &frame,
+                        const char *result);
+
   canbus::Canbus *canbus_{nullptr};
   ::hacan::protocol::CommissioningRole role_{::hacan::protocol::CommissioningRole::kNone};
   std::array<std::optional<::hacan::protocol::EntityLocation>, kMaxConfiguredEntities> owned_{};

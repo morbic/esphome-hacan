@@ -123,5 +123,8 @@ reported through `tx_queue_drops`.
 `HacanComponent` exposes structured C++ accessors for accepted received frames,
 malformed received frames, and successfully transmitted frames. `dump_config()`
 also logs these counters, the persisted NodeAddress, and configured entity
-counts. ESPHome diagnostic entities and protocol `DIAGNOSTIC_REQUEST` handling
-remain deferred.
+counts. At ESPHome `INFO` level, every transmitted and received HACAN frame is
+logged with its raw CAN identifier, CAN flags, DLC, priority, message kind,
+destination, source, hop count, and all eight data bytes. Rejected frames are
+logged as rejected as well. ESPHome diagnostic entities and protocol
+`DIAGNOSTIC_REQUEST` handling remain deferred.
