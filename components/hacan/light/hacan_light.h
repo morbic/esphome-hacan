@@ -1,50 +1,42 @@
 #pragma once
 
-#include <optional>
 #include <array>
 
+#include "esphome/components/light/light_output.h"
+#include "esphome/components/light/light_state.h"
 #include "esphome/components/output/binary_output.h"
-#include "esphome/components/switch/switch.h"
 #include "esphome/core/component.h"
 
-#include "../hacan.h"
 #include "../event_source_binding.h"
+#include "../hacan.h"
 
 namespace esphome::hacan_esphome {
 
-class HacanSwitch final : public switch_::Switch,
-                          public Component,
-                          public ::hacan::protocol::IEndpointHandler,
-                          public ::hacan::protocol::IStateListener,
-                          public IEventActionTarget {
+class HacanLightOutput final : public light::LightOutput,
+                               public Component,
+                               public ::hacan::protocol::IEndpointHandler,
+                               public IEventActionTarget {
  public:
   void set_hacan(HacanComponent *hacan) { hacan_ = hacan; }
   void set_output(output::BinaryOutput *output) { output_ = output; }
   void set_endpoint(uint8_t endpoint) { endpoint_ = endpoint; }
-  void set_state_source_entity(uint32_t entity) { state_source_entity_ = entity; }
+  light::LightTraits get_traits() override;
+  void setup_state(light::LightState *state) override { state_ = state; }
+  void write_state(light::LightState *state) override;
   [[nodiscard]] ::hacan::protocol::EndpointId endpoint() const override {
     return ::hacan::protocol::EndpointId{endpoint_};
   }
   ::hacan::protocol::Status command(::hacan::protocol::TypedValue value) override;
-  [[nodiscard]] ::hacan::protocol::EntityId observed_entity() const override {
-    return ::hacan::protocol::EntityId{state_source_entity_};
-  }
-  void state(::hacan::protocol::TypedValue value,
-             ::hacan::protocol::StateQuality quality) override;
   ::hacan::protocol::IEventListener *add_event_source(uint32_t entity, uint8_t event,
                                                        uint8_t action);
   void apply_event_action(EventAction action) override;
   void dump_config() override;
 
  protected:
-  void write_state(bool state) override;
-  void apply_state(bool state);
-
   HacanComponent *hacan_{nullptr};
   output::BinaryOutput *output_{nullptr};
+  light::LightState *state_{nullptr};
   uint8_t endpoint_{0};
-  uint32_t state_source_entity_{0};
-  std::optional<bool> applied_state_{};
   std::array<EventSourceBinding, 8> event_sources_{};
   uint8_t event_source_count_{0};
 };

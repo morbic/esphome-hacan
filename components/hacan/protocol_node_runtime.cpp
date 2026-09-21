@@ -1,5 +1,7 @@
 #include "protocol_node_runtime.h"
 
+#include "protocol_payload_event.h"
+
 namespace hacan::protocol {
 namespace {
 
@@ -221,6 +223,26 @@ void NodeRuntime::handle(const ProtocolFrame& frame, std::uint32_t now_ms) {
     }
     return;
   }
+  if (frame.identifier().kind() == MessageKind::kEvent &&
+      (frame.identifier().destination().value() == 0x1FF ||
+       (address_ && frame.identifier().destination().value() == address_->value()))) {
+    const auto& bytes = std::get<EventFrame>(frame.payload()).bytes();
+    const auto entity = entity_for(source, EndpointId{bytes[1]});
+    if (entity) {
+      const TypedValue value{static_cast<DataType>(bytes[2]),
+                             {bytes[4], bytes[5], bytes[6], bytes[7]}};
+      for (auto* listener : event_listeners_) {
+        if (listener && listener->observed_entity().value() == entity->value()) {
+          listener->event(value, bytes[3]);
+        }
+      }
+    }
+    if (address_ && frame.identifier().destination().value() == address_->value() &&
+        (bytes[3] & 1U) != 0) {
+      acknowledge(frame, Status::kAccepted);
+    }
+    return;
+  }
   if (frame.identifier().kind() == MessageKind::kCommand && address_ &&
       frame.identifier().destination().value() == address_->value()) {
     const auto& bytes = std::get<CommandFrame>(frame.payload()).bytes();
@@ -237,12 +259,6 @@ void NodeRuntime::handle(const ProtocolFrame& frame, std::uint32_t now_ms) {
     if ((bytes[3] & 1U) != 0) acknowledge(frame, status);
     return;
   }
-  if (frame.identifier().kind() == MessageKind::kEvent && address_ &&
-      frame.identifier().destination().value() == address_->value()) {
-    const auto& bytes = std::get<EventFrame>(frame.payload()).bytes();
-    if ((bytes[3] & 1U) != 0) acknowledge(frame, Status::kAccepted);
-    return;
-  }
   if (frame.identifier().kind() != MessageKind::kDiscoveryResponse ||
       role_ != CommissioningRole::kPrimary || !address_) return;
   if (frame.identifier().destination().value() != address_->value() &&
@@ -254,6 +270,15 @@ void NodeRuntime::handle(const ProtocolFrame& frame, std::uint32_t now_ms) {
 
 bool NodeRuntime::register_owned_entity(EntityId entity, EndpointId endpoint) {
   if (entity.value() == 0 || endpoint.value() == 0 || endpoint.value() == 0xFF) return false;
+  for (const auto& entry : owned_entities_) {
+    if (!entry) continue;
+    if (entry->entity.value() == entity.value() && entry->endpoint.value() == endpoint.value()) {
+      return true;
+    }
+    if (entry->entity.value() == entity.value() || entry->endpoint.value() == endpoint.value()) {
+      return false;
+    }
+  }
   for (auto& entry : owned_entities_) {
     if (!entry) {
       entry = EntityLocation{entity, NodeAddress{0}, endpoint};
@@ -326,6 +351,22 @@ bool NodeRuntime::register_state_listener(IStateListener& listener) {
   return false;
 }
 
+bool NodeRuntime::register_event_listener(IEventListener& listener) {
+  const auto entity = listener.observed_entity();
+  if (entity.value() == 0) return false;
+  for (auto*& registered : event_listeners_) {
+    if (registered == &listener) return true;
+  }
+  for (auto*& registered : event_listeners_) {
+    if (!registered) {
+      if (!register_observed_entity(entity)) return false;
+      registered = &listener;
+      return true;
+    }
+  }
+  return false;
+}
+
 bool NodeRuntime::publish_state(EndpointId endpoint, TypedValue value,
                                 StateQuality quality) {
   if (!address_ || !owns_endpoint(endpoint)) return false;
@@ -334,6 +375,17 @@ bool NodeRuntime::publish_state(EndpointId endpoint, TypedValue value,
                                         NodeAddress{0x1FF}, *address_, 0);
   if (!encoded_payload || !id) return false;
   const auto payload = StateFrame::decode(encoded_payload->encode());
+  if (!payload) return false;
+  return enqueue(ProtocolFrame{*id, *payload});
+}
+
+bool NodeRuntime::publish_event(EndpointId endpoint, TypedValue value, std::uint8_t flags) {
+  if (!address_ || !owns_endpoint(endpoint) || flags != 0) return false;
+  const auto encoded_payload = EventPayload::create(sequence_++, endpoint, value, flags);
+  const auto id = CanIdentifier::create(Priority::kEvent, MessageKind::kEvent,
+                                        NodeAddress{0x1FF}, *address_, 0);
+  if (!encoded_payload || !id) return false;
+  const auto payload = EventFrame::decode(encoded_payload->encode());
   if (!payload) return false;
   return enqueue(ProtocolFrame{*id, *payload});
 }

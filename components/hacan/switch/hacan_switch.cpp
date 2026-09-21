@@ -27,6 +27,27 @@ void HacanSwitch::state(::hacan::protocol::TypedValue value,
   apply_state(value.bytes()[0] != 0);
 }
 
+::hacan::protocol::IEventListener *HacanSwitch::add_event_source(
+    uint32_t entity, uint8_t event, uint8_t action) {
+  if (event_source_count_ == event_sources_.size()) {
+    ESP_LOGE(TAG, "Too many event sources for endpoint 0x%02X", endpoint_);
+    return nullptr;
+  }
+  auto &binding = event_sources_[event_source_count_++];
+  binding.configure(::hacan::protocol::EntityId{entity},
+                    static_cast<::hacan::protocol::ButtonEvent>(event),
+                    static_cast<EventAction>(action), this);
+  return &binding;
+}
+
+void HacanSwitch::apply_event_action(EventAction action) {
+  switch (action) {
+    case EventAction::kToggle: apply_state(!applied_state_.value_or(false)); break;
+    case EventAction::kTurnOn: apply_state(true); break;
+    case EventAction::kTurnOff: apply_state(false); break;
+  }
+}
+
 void HacanSwitch::apply_state(bool state) {
   if (output_ == nullptr || hacan_ == nullptr) {
     ESP_LOGE(TAG, "Output or HACAN component is not configured");

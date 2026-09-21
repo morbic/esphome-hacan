@@ -49,6 +49,13 @@ class IStateListener {
   virtual void state(TypedValue value, StateQuality quality) = 0;
 };
 
+class IEventListener {
+ public:
+  virtual ~IEventListener() = default;
+  [[nodiscard]] virtual EntityId observed_entity() const = 0;
+  virtual void event(TypedValue value, std::uint8_t flags) = 0;
+};
+
 struct EntityLocation {
   EntityId entity{0};
   NodeAddress node{0};
@@ -68,8 +75,10 @@ class NodeRuntime {
   bool register_observed_entity(EntityId entity);
   bool register_endpoint(IEndpointHandler& endpoint);
   bool register_state_listener(IStateListener& listener);
+  bool register_event_listener(IEventListener& listener);
   bool publish_state(EndpointId endpoint, TypedValue value,
                      StateQuality quality = StateQuality::kValid);
+  bool publish_event(EndpointId endpoint, TypedValue value, std::uint8_t flags = 0);
   bool enqueue(const ProtocolFrame& frame);
   bool drain_one();
   [[nodiscard]] std::optional<NodeAddress> address() const { return address_; }
@@ -115,6 +124,7 @@ class NodeRuntime {
   std::array<std::optional<EntityId>, 16> observed_entities_{};
   std::array<IEndpointHandler*, 16> endpoint_handlers_{};
   std::array<IStateListener*, 16> state_listeners_{};
+  std::array<IEventListener*, 16> event_listeners_{};
   std::array<RawCanFrame, 8> control_queue_{};
   std::array<RawCanFrame, 8> event_queue_{};
   std::array<RawCanFrame, 8> state_queue_{};

@@ -16,6 +16,18 @@ void HacanComponent::set_commissioning_role(uint8_t role) {
 void HacanComponent::add_owned_endpoint(
     uint32_t entity, uint8_t endpoint, ::hacan::protocol::IEndpointHandler *handler) {
   for (auto &configured : owned_endpoints_) {
+    if (!configured) continue;
+    if (configured->entity.value() == entity && configured->endpoint.value() == endpoint) {
+      if (handler != nullptr) configured->handler = handler;
+      return;
+    }
+    if (configured->entity.value() == entity || configured->endpoint.value() == endpoint) {
+      ESP_LOGE(TAG, "Conflicting HACAN endpoint entity=0x%08X endpoint=0x%02X",
+               static_cast<unsigned>(entity), endpoint);
+      return;
+    }
+  }
+  for (auto &configured : owned_endpoints_) {
     if (!configured) {
       configured = OwnedEndpoint{::hacan::protocol::EntityId{entity},
                                  ::hacan::protocol::EndpointId{endpoint}, handler};
@@ -37,12 +49,39 @@ void HacanComponent::add_state_listener(::hacan::protocol::IStateListener *liste
            static_cast<unsigned>(kMaxConfiguredEntities));
 }
 
+void HacanComponent::add_event_listener(::hacan::protocol::IEventListener *listener) {
+  if (listener == nullptr) {
+    ESP_LOGE(TAG, "Cannot register a null HACAN event listener");
+    return;
+  }
+  for (auto *configured : event_listeners_) {
+    if (configured == listener) return;
+  }
+  for (auto &configured : event_listeners_) {
+    if (configured == nullptr) {
+      configured = listener;
+      return;
+    }
+  }
+  ESP_LOGE(TAG, "Too many HACAN event listeners; maximum is %u",
+           static_cast<unsigned>(kMaxConfiguredEntities));
+}
+
 bool HacanComponent::publish_bool_state(uint8_t endpoint, bool value) {
   if (!runtime_) return false;
   return runtime_->publish_state(::hacan::protocol::EndpointId{endpoint},
                                  ::hacan::protocol::TypedValue{
                                      ::hacan::protocol::DataType::kBool,
                                      {static_cast<uint8_t>(value), 0, 0, 0}});
+}
+
+bool HacanComponent::publish_button_event(uint8_t endpoint,
+                                          ::hacan::protocol::ButtonEvent event) {
+  if (!runtime_) return false;
+  return runtime_->publish_event(::hacan::protocol::EndpointId{endpoint},
+                                 ::hacan::protocol::TypedValue{
+                                     ::hacan::protocol::DataType::kEnum8,
+                                     {static_cast<uint8_t>(event), 0, 0, 0}});
 }
 
 void HacanComponent::setup() {
@@ -58,6 +97,9 @@ void HacanComponent::setup() {
   }
   for (const auto &listener : state_listeners_) {
     if (listener != nullptr) runtime_->register_state_listener(*listener);
+  }
+  for (auto *listener : event_listeners_) {
+    if (listener != nullptr) runtime_->register_event_listener(*listener);
   }
   canbus_->add_callback([this](uint32_t can_id, bool extended, bool remote,
                                const std::vector<uint8_t> &data) {

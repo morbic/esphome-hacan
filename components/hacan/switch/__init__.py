@@ -2,7 +2,7 @@ import esphome.codegen as cg
 from esphome.components import output, switch
 import esphome.config_validation as cv
 
-from .. import HacanComponent, hacan_ns
+from .. import EVENT_SOURCE_LIST, HacanComponent, hacan_ns
 
 DEPENDENCIES = ["hacan"]
 
@@ -11,6 +11,7 @@ CONF_ENTITY_ID = "entity_id"
 CONF_ENDPOINT = "endpoint"
 CONF_OUTPUT = "output"
 CONF_STATE_SOURCE_ENTITY_ID = "state_source_entity_id"
+CONF_EVENT_SOURCES = "event_sources"
 
 HacanSwitch = hacan_ns.class_("HacanSwitch", switch.Switch, cg.Component)
 
@@ -25,6 +26,7 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_STATE_SOURCE_ENTITY_ID): cv.All(
                 cv.hex_uint32_t, cv.int_range(min=1)
             ),
+            cv.Optional(CONF_EVENT_SOURCES, default=[]): EVENT_SOURCE_LIST,
         }
     )
     .extend(cv.COMPONENT_SCHEMA)
@@ -43,3 +45,8 @@ async def to_code(config):
     if CONF_STATE_SOURCE_ENTITY_ID in config:
         cg.add(var.set_state_source_entity(config[CONF_STATE_SOURCE_ENTITY_ID]))
         cg.add(hacan.add_state_listener(var))
+    for source in config[CONF_EVENT_SOURCES]:
+        listener = var.add_event_source(
+            source["entity_id"], source["event"], source["action"]
+        )
+        cg.add(hacan.add_event_listener(listener))

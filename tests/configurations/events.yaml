@@ -1,0 +1,74 @@
+esphome:
+  name: hacan-events
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+external_components:
+  - source:
+      type: local
+      path: ../../components
+
+canbus:
+  - platform: esp32_can
+    id: hacan_bus
+    can_id: 0x000
+    bit_rate: 125kbps
+    tx_pin: GPIO5
+    rx_pin: GPIO4
+
+hacan:
+  id: hacan_node
+  canbus_id: hacan_bus
+
+binary_sensor:
+  - platform: gpio
+    id: button_in
+    pin:
+      number: GPIO14
+      mode: INPUT_PULLUP
+      inverted: true
+    on_press:
+      - hacan.publish_event:
+          hacan_id: hacan_node
+          entity_id: 0x01010001
+          endpoint: 0x01
+          event: press
+
+output:
+  - platform: gpio
+    id: out01
+    pin: GPIO27
+
+switch:
+  - platform: hacan
+    hacan_id: hacan_node
+    entity_id: 0x01020001
+    endpoint: 0x02
+    output: out01
+    name: Event test switch
+    event_sources:
+      - entity_id: 0x01010001
+        event: click
+        action: toggle
+      - entity_id: 0x01010001
+        event: long_press
+        action: turn_off
+
+light:
+  - platform: hacan
+    id: event_light
+    hacan_id: hacan_node
+    entity_id: 0x01020002
+    endpoint: 0x03
+    output: out01
+    name: Event test light
+    event_sources:
+      - entity_id: 0x01010001
+        event: click
+        action: toggle
+      - entity_id: 0x01010001
+        event: long_press
+        action: turn_off

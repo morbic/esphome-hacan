@@ -4,6 +4,10 @@
 # HACAN
 docs/protocol/inspirations/
 
+# Python bytecode generated while ESPHome validates external components.
+__pycache__/
+*.py[cod]
+
 # Local CMake build trees, including CTest logs and FetchContent downloads.
 /build/
 

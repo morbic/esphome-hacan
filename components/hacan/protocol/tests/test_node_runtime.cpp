@@ -69,6 +69,23 @@ class CapturingStateListener final : public IStateListener {
   StateQuality last_quality{StateQuality::kValid};
 };
 
+class CapturingEventListener final : public IEventListener {
+ public:
+  explicit CapturingEventListener(EntityId entity) : entity_(entity) {}
+
+  EntityId observed_entity() const override { return entity_; }
+  void event(TypedValue value, std::uint8_t flags) override {
+    ++updates;
+    last_value = value;
+    last_flags = flags;
+  }
+
+  EntityId entity_;
+  std::uint8_t updates{0};
+  TypedValue last_value{DataType::kNull, {0, 0, 0, 0}};
+  std::uint8_t last_flags{0};
+};
+
 TEST_CASE("primary manager assigns an address to a discovered unassigned node") {
   MemoryStorage storage;
   storage.value = NodeAddress{0x001};
@@ -265,6 +282,61 @@ TEST_CASE("runtime delivers an observed state to every listener for its entity")
   CHECK(second.updates == 1);
   CHECK(first.last_value.type() == DataType::kBool);
   CHECK(first.last_value.bytes()[0] == 1);
+}
+
+TEST_CASE("runtime delivers a broadcast event to every listener for its entity") {
+  MemoryStorage storage;
+  storage.value = NodeAddress{1};
+  CapturingTransmitter transmitter;
+  NodeRuntime runtime{{1, 2, 3, 4, 5, 6}, CommissioningRole::kNone, storage, transmitter};
+  CapturingEventListener first{EntityId{0x01010001}};
+  CapturingEventListener second{EntityId{0x01010001}};
+  REQUIRE(runtime.register_event_listener(first));
+  REQUIRE(runtime.register_event_listener(second));
+
+  const auto claim_id = CanIdentifier::create(Priority::kManagement, MessageKind::kEntityClaim,
+                                              NodeAddress{0x1FF}, NodeAddress{2}, 0);
+  REQUIRE(claim_id);
+  runtime.receive({claim_id->to_raw(), true, 8, {1, 3, 1, 0, 1, 1, 0, 0}}, 100);
+
+  const auto event_id = CanIdentifier::create(Priority::kEvent, MessageKind::kEvent,
+                                              NodeAddress{0x1FF}, NodeAddress{2}, 0);
+  REQUIRE(event_id);
+  runtime.receive({event_id->to_raw(), true, 8,
+                   {2, 3, static_cast<std::uint8_t>(DataType::kEnum8), 0, 3, 0, 0, 0}},
+                  101);
+
+  CHECK(first.updates == 1);
+  CHECK(second.updates == 1);
+  CHECK(first.last_value.type() == DataType::kEnum8);
+  CHECK(first.last_value.bytes()[0] == 3);
+  CHECK(first.last_flags == 0);
+}
+
+TEST_CASE("runtime publishes every owned event without coalescing") {
+  MemoryStorage storage;
+  storage.value = NodeAddress{1};
+  CapturingTransmitter transmitter;
+  NodeRuntime runtime{{1, 2, 3, 4, 5, 6}, CommissioningRole::kNone, storage, transmitter};
+  REQUIRE(runtime.register_owned_entity(EntityId{0x01010001}, EndpointId{3}));
+  const TypedValue click{DataType::kEnum8, {3, 0, 0, 0}};
+  REQUIRE(runtime.publish_event(EndpointId{3}, click));
+  REQUIRE(runtime.publish_event(EndpointId{3}, click));
+
+  REQUIRE(runtime.drain_one());
+  const auto first = FrameCodec::decode(transmitter.last);
+  REQUIRE(std::holds_alternative<ProtocolFrame>(first));
+  CHECK(std::get<ProtocolFrame>(first).identifier().kind() == MessageKind::kEvent);
+  CHECK(std::get<ProtocolFrame>(first).identifier().priority() == Priority::kEvent);
+  CHECK(std::get<ProtocolFrame>(first).identifier().destination().value() == 0x1FF);
+  CHECK(std::get<EventFrame>(std::get<ProtocolFrame>(first).payload()).bytes()[1] == 3);
+
+  REQUIRE(runtime.drain_one());
+  const auto second = FrameCodec::decode(transmitter.last);
+  REQUIRE(std::holds_alternative<ProtocolFrame>(second));
+  CHECK(std::get<ProtocolFrame>(second).identifier().kind() == MessageKind::kEvent);
+  CHECK(std::get<EventFrame>(std::get<ProtocolFrame>(second).payload()).bytes()[0] !=
+        std::get<EventFrame>(std::get<ProtocolFrame>(first).payload()).bytes()[0]);
 }
 
 TEST_CASE("runtime dispatches a boolean command to a registered endpoint") {

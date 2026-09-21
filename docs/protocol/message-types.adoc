@@ -186,6 +186,20 @@ Reliable unicast event retries retain the sequence, set `RETRY`, and use the
 same timeout and duplicate-ACK rules as commands. Every new occurrence,
 including one with an equal value, uses a new sequence.
 
+==== Button event profile
+
+The initial button profile uses `ENUM8`; the source recognizes gestures locally.
+
+[cols="1,2,3",options="header"]
+|===
+|Value |Name |Meaning
+|`0x01` |`press` |Physical input became active.
+|`0x02` |`release` |Physical input became inactive.
+|`0x03` |`click` |A configured single-click gesture completed.
+|`0x04` |`double_click` |A configured double-click gesture completed.
+|`0x05` |`long_press` |A configured long-press gesture completed.
+|===
+
 === COMMAND
 
 [cols="1,2,4",options="header"]

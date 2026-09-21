@@ -1,0 +1,6 @@
+packages:
+  base: !include events.yaml
+
+esp32:
+  framework:
+    type: arduino

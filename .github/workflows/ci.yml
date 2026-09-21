@@ -51,6 +51,10 @@ jobs:
             config: examples/endpoints.yaml
           - framework: Arduino endpoints
             config: examples/endpoints-arduino.yaml
+          - framework: ESP-IDF events
+            config: tests/configurations/events.yaml
+          - framework: Arduino events
+            config: tests/configurations/events-arduino.yaml
 
     steps:
       - name: Check out repository
@@ -72,6 +76,8 @@ jobs:
           esphome config examples/commissioning-peer.yaml
           esphome config examples/endpoints.yaml
           esphome config examples/endpoints-arduino.yaml
+          esphome config tests/configurations/events.yaml
+          esphome config tests/configurations/events-arduino.yaml
 
       - name: Reject legacy manual entity lists
         run: |

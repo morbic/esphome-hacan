@@ -4,8 +4,10 @@
 #include <optional>
 
 #include "esphome/components/canbus/canbus.h"
+#include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 #include "esphome/core/preferences.h"
+#include "protocol_button_event.h"
 #include "protocol_node_runtime.h"
 
 namespace esphome::hacan_esphome {
@@ -19,7 +21,9 @@ class HacanComponent : public Component, public ::hacan::protocol::IFrameTransmi
   void add_owned_endpoint(uint32_t entity, uint8_t endpoint,
                           ::hacan::protocol::IEndpointHandler *handler);
   void add_state_listener(::hacan::protocol::IStateListener *listener);
+  void add_event_listener(::hacan::protocol::IEventListener *listener);
   bool publish_bool_state(uint8_t endpoint, bool value);
+  bool publish_button_event(uint8_t endpoint, ::hacan::protocol::ButtonEvent event);
   void setup() override;
   void loop() override;
   void dump_config() override;
@@ -51,12 +55,29 @@ class HacanComponent : public Component, public ::hacan::protocol::IFrameTransmi
   };
   std::array<std::optional<OwnedEndpoint>, kMaxConfiguredEntities> owned_endpoints_{};
   std::array<::hacan::protocol::IStateListener *, kMaxConfiguredEntities> state_listeners_{};
+  std::array<::hacan::protocol::IEventListener *, kMaxConfiguredEntities> event_listeners_{};
   std::optional<::hacan::protocol::NodeRuntime> runtime_{};
   ESPPreferenceObject address_preference_{};
   std::array<uint8_t, 6> uid_{};
   uint32_t rx_frames_{0};
   uint32_t malformed_frames_{0};
   uint32_t tx_frames_{0};
+};
+
+template<typename... Ts> class PublishEventAction final : public Action<Ts...> {
+ public:
+  void set_hacan(HacanComponent *hacan) { hacan_ = hacan; }
+  void set_endpoint(uint8_t endpoint) { endpoint_ = endpoint; }
+  void set_event(uint8_t event) { event_ = static_cast<::hacan::protocol::ButtonEvent>(event); }
+
+  void play(const Ts &...x) override {
+    if (hacan_ != nullptr) hacan_->publish_button_event(endpoint_, event_);
+  }
+
+ protected:
+  HacanComponent *hacan_{nullptr};
+  uint8_t endpoint_{0};
+  ::hacan::protocol::ButtonEvent event_{::hacan::protocol::ButtonEvent::kPress};
 };
 
 }  // namespace esphome::hacan_esphome

@@ -114,9 +114,11 @@ The first two profiles are deliberately narrow:
   `COMMAND<bool>`, and publishes the resulting `STATE<bool>`. Its optional
   state-source subscription is represented by a portable `IStateListener`;
   one source entity may therefore fan out to many local switch outputs.
-
-Neither profile sends `EVENT`; momentary-button semantics are a separate
-endpoint profile.
+* `hacan.publish_event` sends a local ESPHome-recognized button gesture. Each
+  `event_sources` item is a portable listener binding, allowing one event to
+  drive multiple local switch or light actions.
+* `light: platform: hacan` is a binary `ON_OFF` light backed by a local output,
+  `COMMAND<bool>`, and `STATE<bool>`.
 
 == Queue policy
 

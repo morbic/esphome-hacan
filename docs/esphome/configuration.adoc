@@ -74,6 +74,33 @@ binary_sensor:
 `id` is required by ESPHome even when `internal: true` hides the mirrored
 endpoint from Home Assistant.
 
+== Momentary button events
+
+Use native ESPHome binary-sensor automations to recognize gestures locally and
+publish the resulting HACAN event. `hacan.publish_event` owns its declared
+EntityId and endpoint automatically.
+
+[source,yaml]
+----
+binary_sensor:
+  - platform: gpio
+    id: living_room_button
+    pin: GPIO14
+    on_multi_click:
+      - timing:
+          - ON for at most 400ms
+          - OFF for at least 300ms
+        then:
+          - hacan.publish_event:
+              hacan_id: hacan_node
+              entity_id: 0x01010001
+              endpoint: 0x01
+              event: click
+----
+
+Available event names are `press`, `release`, `click`, `double_click`, and
+`long_press`.
+
 == Switch endpoint
 
 `switch: platform: hacan` owns a local binary `output` and its EntityId. A
@@ -105,6 +132,29 @@ switch:
 The endpoint declarations above register ownership automatically. Multiple
 HACAN switches, including switches on different nodes, may use the same
 `state_source_entity_id`; every one mirrors the received state independently.
+
+`event_sources` binds recognized button events to local actions. It accepts
+multiple entries, including several gestures from one source entity:
+
+[source,yaml]
+----
+event_sources:
+  - entity_id: 0x01010001
+    event: click
+    action: toggle
+  - entity_id: 0x01010001
+    event: long_press
+    action: turn_off
+----
+
+Supported actions are `toggle`, `turn_on`, and `turn_off`.
+
+== Binary light endpoint
+
+`light: platform: hacan` exposes a local binary output as an `ON_OFF` light in
+Home Assistant. It accepts `COMMAND<bool>`, publishes `STATE<bool>`, and
+supports the same `event_sources` configuration as a HACAN switch. Brightness
+will be a future additive extension with a separate numeric endpoint.
 
 == Commissioning roles
 
